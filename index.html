@@ -1,0 +1,2001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Chart.js for Dashboard -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- PDF Generation Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    
+    <!-- PapaParse for CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .scroller { -webkit-overflow-scrolling: touch; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .nav-item-active { background-color: #eff6ff; color: #2563eb; border-right: 3px solid #2563eb; }
+        .nav-item-inactive { color: #64748b; }
+        .nav-item-inactive:hover { background-color: #f8fafc; color: #1e293b; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
+        
+        /* Toast Animation */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .toast-enter { animation: slideIn 0.3s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 h-screen flex overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-16 md:w-64 bg-white border-r border-gray-200 flex flex-col flex-none z-30 transition-all duration-300">
+        <div class="h-16 flex items-center justify-center md:justify-start md:px-6 border-b border-gray-100 flex-none">
+            <div class="bg-blue-600 p-1.5 rounded-lg">
+                <i data-lucide="package" class="w-6 h-6 text-white"></i>
+            </div>
+            <span class="hidden md:block ml-3 font-bold text-lg text-gray-800 tracking-tight">Inventory</span>
+        </div>
+
+        <nav class="flex-1 py-6 flex flex-col gap-2 px-2 md:px-4 overflow-y-auto scroller">
+            <button onclick="app.setActiveTab('dashboard')" id="nav-dashboard" class="nav-btn group flex items-center justify-center md:justify-start px-3 py-3 rounded-lg transition-all">
+                <i data-lucide="layout-dashboard" class="w-6 h-6 flex-none"></i>
+                <span class="hidden md:block ml-3 font-medium text-sm">Dashboard</span>
+            </button>
+            <div class="my-1 border-t border-gray-100"></div>
+            <button onclick="app.setActiveTab('storage')" id="nav-storage" class="nav-btn group flex items-center justify-center md:justify-start px-3 py-3 rounded-lg transition-all">
+                <i data-lucide="package" class="w-6 h-6 flex-none"></i>
+                <span class="hidden md:block ml-3 font-medium text-sm">Storage</span>
+            </button>
+            <button onclick="app.setActiveTab('floors')" id="nav-floors" class="nav-btn group flex items-center justify-center md:justify-start px-3 py-3 rounded-lg transition-all">
+                <i data-lucide="layers" class="w-6 h-6 flex-none"></i>
+                <span class="hidden md:block ml-3 font-medium text-sm">Floors</span>
+            </button>
+            <button onclick="app.setActiveTab('boxes')" id="nav-boxes" class="nav-btn group flex items-center justify-center md:justify-start px-3 py-3 rounded-lg transition-all">
+                <i data-lucide="box" class="w-6 h-6 flex-none"></i>
+                <span class="hidden md:block ml-3 font-medium text-sm">Boxes</span>
+            </button>
+            <div class="my-2 border-t border-gray-100"></div>
+            <button onclick="app.setActiveTab('activity')" id="nav-activity" class="nav-btn group flex items-center justify-center md:justify-start px-3 py-3 rounded-lg transition-all">
+                <i data-lucide="clipboard-list" class="w-6 h-6 flex-none"></i>
+                <span class="hidden md:block ml-3 font-medium text-sm">Activity Log</span>
+            </button>
+        </nav>
+        
+        <!-- Settings Footer -->
+        <div class="p-4 border-t border-gray-100">
+             <button onclick="app.setActiveTab('settings')" id="nav-settings" class="w-full nav-btn group flex items-center justify-center md:justify-start px-3 py-3 rounded-lg transition-all hover:bg-gray-50 text-gray-500 hover:text-gray-900">
+                <i data-lucide="settings" class="w-6 h-6 flex-none"></i>
+                <span class="hidden md:block ml-3 font-medium text-sm">Settings</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col min-w-0 bg-gray-50">
+        <header class="bg-white border-b border-gray-200 h-16 px-4 md:px-8 flex items-center justify-between shadow-sm z-10 flex-none">
+            <div>
+                <h1 id="header-title" class="text-xl font-bold text-gray-800">Overview</h1>
+                <p class="text-xs text-gray-500 hidden sm:block">Manage your equipment inventory and locations</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full border border-green-200 font-medium flex items-center gap-1">
+                    <div class="w-1.5 h-1.5 rounded-full bg-green-500"></div> Live
+                </span>
+            </div>
+        </header>
+
+        <main id="main-content" class="flex-1 overflow-y-auto p-4 md:p-8 scroller relative">
+            <div id="loading-state" class="flex h-full items-center justify-center text-gray-500">
+                <div class="animate-spin mr-2"><i data-lucide="loader-2"></i></div>
+                Loading data...
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-container" class="hidden fixed inset-0 z-50">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onclick="app.closeModal()"></div>
+        <div id="modal-content" class="relative z-10 w-full h-full flex items-center justify-center p-4 pointer-events-none"></div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="app.closeConfirmModal()"></div>
+        <div class="bg-white rounded-xl shadow-2xl p-6 relative w-full max-w-sm transform transition-all scale-100">
+            <h3 class="text-lg font-bold text-gray-800 mb-2">Confirm Action</h3>
+            <p id="confirm-message" class="text-gray-600 mb-6 text-sm">Are you sure you want to proceed?</p>
+            <div class="flex gap-3 justify-end">
+                <button onclick="app.closeConfirmModal()" class="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg text-sm font-medium transition">Cancel</button>
+                <button onclick="app.executePendingAction()" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 shadow-lg transition">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Input for File Upload -->
+    <input type="file" id="csv-upload" accept=".csv" class="hidden" onchange="app.handleFileUpload(event)">
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-[70] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, writeBatch, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- FIREBASE CONFIGURATION ---
+        // TO CONNECT YOUR OWN GOOGLE CLOUD / FIREBASE DATABASE:
+        // 1. Go to Firebase Console > Project Settings.
+        // 2. Copy the "firebaseConfig" object.
+        // 3. Uncomment the fields below and paste your values.
+        
+        const customConfig = {
+            // apiKey: "PASTE_YOUR_API_KEY_HERE",
+            // authDomain: "YOUR_PROJECT.firebaseapp.com",
+            // projectId: "YOUR_PROJECT_ID",
+            // storageBucket: "YOUR_PROJECT.appspot.com",
+            // messagingSenderId: "YOUR_SENDER_ID",
+            // appId: "YOUR_APP_ID"
+        };
+
+        // Logic to select which config to use
+        let firebaseConfig;
+        if (customConfig.apiKey) {
+            console.log("Using Custom Firebase Config");
+            firebaseConfig = customConfig;
+        } else if (typeof __firebase_config !== 'undefined') {
+            // Fallback to the preview environment's auto-generated config
+            firebaseConfig = JSON.parse(__firebase_config);
+        } else {
+            console.error("No Firebase configuration found.");
+        }
+
+        const appInstance = initializeApp(firebaseConfig);
+        const auth = getAuth(appInstance);
+        const db = getFirestore(appInstance);
+        
+        // Use custom appId if provided in config, otherwise default
+        const appId = customConfig.appId ? 'inventory-app' : (typeof __app_id !== 'undefined' ? __app_id : 'default-app-id');
+
+        const state = {
+            user: null,
+            inventory: [],
+            locations: [],
+            logs: [],
+            // Added retiredIds to track permanently deleted IDs
+            masterData: { categories: [], retiredIds: [] }, 
+            activeTab: 'dashboard', 
+            storageViewMode: 'active', 
+            settingsTab: 'categories',
+            currentModal: null, 
+            pendingAction: null,
+            loading: true,
+            searchTerm: ''
+        };
+
+        // --- 1. UTILITIES ---
+        window.esc = (str) => {
+            if (typeof str !== 'string') return str;
+            return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        };
+
+        function getFloorPrefix(name) {
+            const match = name.match(/(\d+)/);
+            if (match) return match[0]; 
+            const words = name.split(' ');
+            if (words.length > 1) return words.map(w => w[0]).join('').toUpperCase().substring(0, 2);
+            return name.substring(0, 2).toUpperCase();
+        }
+
+        function getLocationName(locationId) {
+            if (!locationId) return '<span class="text-gray-400 italic">Unassigned</span>';
+            const loc = state.locations.find(l => l.id === locationId);
+            return loc ? `<span class="text-blue-600 font-medium">${loc.name}</span>` : '<span class="text-red-400">Unknown Loc</span>';
+        }
+        
+        function getLocationNamePlain(locationId) {
+            if (!locationId) return 'Storage';
+            if (locationId === 'PULLOUT') return 'Pullout / Disposal';
+            const loc = state.locations.find(l => l.id === locationId);
+            return loc ? loc.name : 'Unknown Location';
+        }
+
+        function generateLocationCard(location, iconName, iconColorClass, bgClass, borderColorClass) {
+            const count = state.inventory.filter(i => i.locationId === location.id).length;
+            let statusBadge = '';
+            if (location.type === 'room' && location.status) {
+                const s = location.status;
+                let color = 'bg-gray-100 text-gray-600';
+                if (s === 'vacant') color = 'bg-green-100 text-green-700 border-green-200';
+                else if (s === 'occupied') color = 'bg-red-100 text-red-700 border-red-200';
+                else if (s === 'maintenance') color = 'bg-yellow-100 text-yellow-700 border-yellow-200';
+                statusBadge = `<div class="w-2.5 h-2.5 rounded-full ${color.replace('text-', 'bg-').split(' ')[0].replace('100', '500')} absolute top-3 right-3"></div>`;
+            }
+            return `<div onclick="app.openLocationDetail('${location.id}')" class="relative border ${borderColorClass || 'border-gray-200'} rounded-xl p-4 hover:shadow-md hover:border-blue-400 cursor-pointer transition flex flex-col items-center justify-center text-center group bg-white h-32">
+                ${statusBadge}
+                <div class="mb-1 text-xs font-bold text-gray-400 uppercase tracking-widest font-mono">${location.customId || 'NO-ID'}</div>
+                <h4 class="font-bold text-gray-900 text-base leading-tight mb-2 px-2 line-clamp-2">${location.name}</h4>
+                <div class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full font-medium">${count} Items</div>
+                <button onclick="event.stopPropagation(); app.openEditLocationModal('${location.id}')" class="absolute bottom-2 right-2 p-1.5 text-gray-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition opacity-0 group-hover:opacity-100"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+            </div>`;
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'error' ? 'bg-red-50 text-red-800 border-red-200' : 'bg-green-50 text-green-800 border-green-200';
+            toast.className = `toast-enter p-3 rounded-lg shadow-lg border text-sm font-medium flex items-center gap-2 ${bgClass}`;
+            toast.innerHTML = type === 'error' ? `<i data-lucide="alert-circle" class="w-4 h-4"></i> ${message}` : `<i data-lucide="check-circle" class="w-4 h-4"></i> ${message}`;
+            container.appendChild(toast);
+            lucide.createIcons();
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        async function logActivity(action, details) {
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'logs'), {
+                    action,
+                    details,
+                    timestamp: new Date().toISOString(),
+                    user: 'User' 
+                });
+            } catch (e) { console.error("Log error", e); }
+        }
+
+        async function saveMasterData() {
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'global_settings', 'masterData'), state.masterData);
+            } catch(e) { console.error("Save master error", e); }
+        }
+
+        // --- CORE MODAL RENDERER (Moved Up) ---
+        function renderModal(type, data = {}) {
+            state.currentModal = { type, data };
+            const container = document.getElementById('modal-container');
+            const content = document.getElementById('modal-content');
+            let html = '';
+            
+            if (type === 'addItem') {
+                const cats = state.masterData.categories || [];
+                const preCat = data.category;
+                const preSub = data.subCategory;
+
+                const catOptions = cats.length > 0 
+                    ? cats.map(c => `<option value="${c.name}" ${c.name === preCat ? 'selected' : ''}>${c.name}</option>`).join('') 
+                    : '<option value="" disabled>No categories. Go to Settings to add.</option>';
+                
+                let subOptions = '<option value="" disabled selected>Select Category First</option>';
+                let idValue = '';
+
+                if (preCat) {
+                    const catObj = cats.find(c => c.name === preCat);
+                    if (catObj && catObj.subs) {
+                        subOptions = '<option value="" disabled>Select...</option>' + 
+                            catObj.subs.map(s => `<option value="${s}" ${s === preSub ? 'selected' : ''}>${s}</option>`).join('');
+                    }
+                }
+
+                if (preSub) {
+                     // Generate ID immediately using the smart logic
+                     let prefix = preSub.split(' ').map(word => word[0]).join('').toUpperCase();
+                     if (prefix.length < 2) prefix = preSub.substring(0, 2).toUpperCase();
+                     // Use the helper to find gap or new ID, respecting retired IDs
+                     idValue = app.generateNextId(prefix);
+                }
+                
+                html = `<div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100">
+                    <div class="flex justify-between items-center mb-6"><h2 class="text-xl font-bold flex items-center gap-2"><i data-lucide="plus-circle" class="w-6 h-6 text-blue-600"></i> Add New Item</h2><button onclick="app.closeModal()" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+                    <form onsubmit="app.submitAddItem(event)" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="col-span-2">
+                                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Item Name</label>
+                                <input name="name" required placeholder="e.g., Godox SL60W" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" />
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Category</label>
+                                <select id="input-category" name="category" required onchange="app.updateSubCategoryOptions(this.value)" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition cursor-pointer">
+                                    <option value="" disabled selected>Select...</option>
+                                    ${catOptions}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Sub-Category</label>
+                                <select id="input-subcategory" name="subCategory" required onchange="app.generateIdFromSubCategory(this.value)" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition cursor-pointer">
+                                    ${subOptions}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Quantity</label><input name="quantity" type="number" min="1" value="1" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" /></div>
+                            <div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Equipment ID</label><input id="input-equipment-id" name="equipmentId" required value="${idValue}" placeholder="e.g., SL-0001" class="w-full p-3 bg-gray-100 border border-gray-200 rounded-lg font-mono uppercase focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" /></div>
+                        </div>
+                        <div class="flex gap-3 pt-6 border-t border-gray-100 mt-2">
+                            <button type="button" onclick="app.closeModal()" class="flex-1 py-3 text-gray-600 font-medium hover:bg-gray-50 rounded-lg transition">Cancel</button>
+                            <button type="submit" class="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition transform active:scale-95">Save Item</button>
+                        </div>
+                    </form>
+                </div>`;
+            } else if (type === 'manageCategory') {
+                const isRename = data.action === 'rename';
+                html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><h3 class="font-bold text-xl mb-6 text-gray-800">${isRename ? 'Rename Category' : 'New Category'}</h3><form onsubmit="app.submitManageCategory(event, '${data.action}', '${data.name || ''}')"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Category Name</label><input name="name" required value="${data.name || ''}" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition mb-6" autofocus /><div class="flex justify-end gap-3"><button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button><button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-lg hover:bg-blue-700 transition transform active:scale-95">Save</button></div></form></div>`;
+            } else if (type === 'manageSubCategory') {
+                const isRename = data.action === 'rename';
+                html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><h3 class="font-bold text-xl mb-6 text-gray-800">${isRename ? 'Rename Sub-Category' : `New Sub-Category for ${data.parentCat}`}</h3><form onsubmit="app.submitManageSubCategory(event, '${data.action}', '${data.parentCat}', '${data.name || ''}')"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Sub-Category Name</label><input name="name" required value="${data.name || ''}" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition mb-6" autofocus /><div class="flex justify-end gap-3"><button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button><button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-lg hover:bg-blue-700 transition transform active:scale-95">Save</button></div></form></div>`;
+            } else if (type === 'moveSubCategory') {
+                const categories = state.masterData.categories.filter(c => c.name !== data.currentParent);
+                const options = categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+                html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><h3 class="font-bold text-xl mb-2 text-gray-800">Move Sub-Category</h3><p class="text-sm text-gray-500 mb-6">Moving <strong>${data.subName}</strong> to another category.</p><form onsubmit="app.submitMoveSubCategory(event, '${data.subName}', '${data.currentParent}')"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">New Parent Category</label><select name="newParent" required class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition mb-6"><option value="" disabled selected>Select Category...</option>${options}</select><div class="flex justify-end gap-3"><button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button><button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-lg hover:bg-blue-700 transition transform active:scale-95">Move & Update Items</button></div></form></div>`;
+            } else if (type === 'addStock') {
+                 const sampleItem = state.inventory.find(i => i.name === data.name && i.category === data.category && i.subCategory === data.subCategory);
+                 let nextIdHint = '';
+                 if(sampleItem) {
+                     const match = sampleItem.equipmentId.match(/^(.*?)-?(\d+)$/);
+                     if(match) {
+                         const prefix = match[1] + (sampleItem.equipmentId.includes('-') ? '-' : '');
+                         nextIdHint = app.generateNextId(prefix);
+                     }
+                 }
+                 html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><h3 class="font-bold text-xl mb-2 text-gray-800">Add Stock</h3><p class="text-sm text-gray-500 mb-6">Adding more: <strong>${data.name}</strong></p><form onsubmit="app.submitAddItem(event)" class="space-y-4"><input type="hidden" name="name" value="${data.name}"><input type="hidden" name="category" value="${data.category}"><input type="hidden" name="subCategory" value="${data.subCategory}"><div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Quantity to Add</label><input name="quantity" type="number" min="1" value="1" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" autofocus /></div><div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Start Equipment ID</label><input name="equipmentId" required value="${nextIdHint}" class="w-full p-3 bg-gray-100 border border-gray-200 rounded-lg font-mono uppercase focus:ring-2 focus:ring-blue-500 outline-none transition" /><p class="text-[10px] text-gray-400 mt-1">Adjust if necessary. Will increment automatically.</p></div><div class="flex justify-end gap-3 pt-2"><button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button><button type="submit" class="px-5 py-2.5 bg-green-600 text-white rounded-lg font-medium shadow-lg hover:bg-green-700 transition transform active:scale-95">Add Stock</button></div></form></div>`;
+            } else if (type === 'addLocation') {
+                const isRoom = data.type === 'room'; const isBox = data.type === 'box'; let title = 'New Location'; let nextId = ''; if (data.type === 'floor') title = 'New Floor'; else if (isBox) { title = 'New Box'; const existingBoxes = state.locations.filter(l => l.type === 'box'); nextId = `Box ${existingBoxes.length + 1}`; } else if (isRoom) { title = 'New Room'; const parentFloor = state.locations.find(l => l.id === data.parentId); const existingRooms = state.locations.filter(l => l.type === 'room' && l.parentId === data.parentId); let prefix = "RM"; if (parentFloor) { prefix = getFloorPrefix(parentFloor.name); } const nextNum = String(existingRooms.length + 1).padStart(3, '0'); nextId = `${prefix}-${nextNum}`; }
+                html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><h3 class="font-bold text-xl mb-6 text-gray-800">${title}</h3><form onsubmit="app.submitAddLocation(event)"><input type="hidden" name="type" value="${data.type}"><input type="hidden" name="parentId" value="${data.parentId || ''}">${isRoom || isBox ? `<div class="mb-4"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">${isRoom ? 'Room' : 'Box'} ID (Auto)</label><input name="customId" value="${nextId}" class="w-full p-3 bg-gray-100 border border-gray-200 rounded-lg text-gray-600 font-mono text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition" /></div>` : ''}<div class="mb-4"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Name / Label</label><input name="name" required placeholder="Name..." class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" autofocus /></div>${isRoom ? `<div class="mb-6"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Initial Status</label><select name="status" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"><option value="vacant">Vacant (Green)</option><option value="occupied">Occupied (Red)</option><option value="maintenance">Maintenance (Yellow)</option></select></div>` : ''}<div class="flex justify-end gap-3 ${!isRoom ? 'mt-6' : ''}"><button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button><button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-lg hover:bg-blue-700 transition transform active:scale-95">Create</button></div></form></div>`;
+            } else if (type === 'editLocation') {
+                const loc = state.locations.find(l => l.id === data.locationId); if (!loc) return;
+                html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><h3 class="font-bold text-xl mb-6 text-gray-800">Edit ${loc.type}</h3><form onsubmit="app.submitEditLocation(event, '${loc.id}')">${loc.type !== 'floor' ? `<div class="mb-4"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">ID</label><input name="customId" value="${loc.customId || ''}" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg font-mono text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition" /></div>` : ''}<div class="mb-6"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Name</label><input name="name" required value="${loc.name}" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" autofocus /></div><div class="flex justify-between gap-3 pt-2"><button type="button" id="btn-delete-loc" onclick="app.deleteLocation('${loc.id}')" class="px-4 py-2.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition">Delete</button><div class="flex gap-3"><button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button><button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-lg hover:bg-blue-700 transition transform active:scale-95">Update</button></div></div></form></div>`;
+            } else if (type === 'moveItem') {
+                const item = state.inventory.find(i => i.id === data.itemId); if (!item) return;
+                const floors = state.locations.filter(l => l.type === 'floor'); const boxes = state.locations.filter(l => l.type === 'box');
+                let options = `<option value="">Storage (Default)</option>`;
+                floors.forEach(f => { const rooms = state.locations.filter(l => l.type === 'room' && l.parentId === f.id); if(rooms.length > 0) { options += `<optgroup label="${f.name}">`; rooms.forEach(r => options += `<option value="${r.id}" ${item.locationId === r.id ? 'selected' : ''}>${r.name}</option>`); options += `</optgroup>`; } });
+                if(boxes.length > 0) { options += `<optgroup label="Boxes">`; boxes.forEach(b => options += `<option value="${b.id}" ${item.locationId === b.id ? 'selected' : ''}>${b.name}</option>`); options += `</optgroup>`; }
+                options += `<option value="PULLOUT" class="text-red-600 font-bold">Pullout / Disposal</option>`;
+                html = `<div class="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl p-6 shadow-2xl pointer-events-auto animate-slide-up sm:animate-in mb-0 sm:mb-auto absolute bottom-0 sm:relative border-t sm:border border-gray-100"><div class="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-4 sm:hidden"></div><h3 class="text-xl font-bold mb-1 text-gray-900">Move Item</h3><p class="text-sm text-gray-500 mb-6">Where do you want to move <strong class="text-blue-600">${item.name}</strong> (${item.equipmentId})?</p><div class="space-y-5"><div><label class="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">Select Location</label><div class="relative"><i data-lucide="map-pin" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5 z-10"></i><select id="move-select" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer">${options}</select><i data-lucide="chevron-down" class="absolute right-3 top-3.5 text-gray-400 w-4 h-4 pointer-events-none"></i></div></div><div class="flex gap-3 pt-2"><button type="button" onclick="app.closeModal()" class="flex-1 py-3 text-gray-600 font-medium text-sm hover:bg-gray-100 rounded-xl transition">Cancel</button><button id="btn-move-confirm" onclick="app.submitMoveItem('${item.id}', document.getElementById('move-select').value, '${window.esc(item.name)}', '${window.esc(item.equipmentId)}')" class="flex-1 py-3 bg-blue-600 text-white font-medium text-sm rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition flex justify-center items-center transform active:scale-95">Confirm</button></div></div></div>`;
+            } else if (type === 'swapContents') {
+                const sourceLoc = state.locations.find(l => l.id === data.locationId); if (!sourceLoc) return;
+                const floors = state.locations.filter(l => l.type === 'floor'); const boxes = state.locations.filter(l => l.type === 'box');
+                let options = ``; floors.forEach(f => { const rooms = state.locations.filter(l => l.type === 'room' && l.parentId === f.id); if(rooms.length > 0) { options += `<optgroup label="${f.name}">`; rooms.forEach(r => options += `<option value="${r.id}">${r.name}</option>`); options += `</optgroup>`; } });
+                if(boxes.length > 0) { options += `<optgroup label="Boxes">`; boxes.forEach(b => { if (b.id !== sourceLoc.id) options += `<option value="${b.id}">${b.name}</option>`; }); options += `</optgroup>`; }
+                html = `<div class="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl p-6 shadow-2xl pointer-events-auto animate-slide-up sm:animate-in mb-0 sm:mb-auto absolute bottom-0 sm:relative border-t sm:border border-gray-100"><div class="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-4 sm:hidden"></div><div class="flex items-center gap-3 mb-2"><div class="bg-indigo-100 p-2 rounded-lg text-indigo-600"><i data-lucide="arrow-right-left" class="w-6 h-6"></i></div><h3 class="text-xl font-bold text-gray-900">Swap Action</h3></div><p class="text-sm text-gray-500 mb-6">Choose action for <strong class="text-gray-900">${sourceLoc.name}</strong>.</p><div class="space-y-4"><div><label class="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">Target Location</label><div class="relative"><i data-lucide="map-pin" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5 z-10"></i><select id="swap-select" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer"><option value="" disabled selected>Select a location...</option>${options}</select><i data-lucide="chevron-down" class="absolute right-3 top-3.5 text-gray-400 w-4 h-4 pointer-events-none"></i></div></div><div><label class="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">Action Type</label><div class="grid grid-cols-2 gap-2"><label class="cursor-pointer"><input type="radio" name="swapType" value="contents" checked class="peer sr-only"><div class="border rounded-xl p-3 text-center text-sm font-medium text-gray-500 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700 transition">Swap Contents<span class="block text-[10px] font-normal mt-0.5">Move items only</span></div></label><label class="cursor-pointer"><input type="radio" name="swapType" value="room" class="peer sr-only"><div class="border rounded-xl p-3 text-center text-sm font-medium text-gray-500 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700 transition">Swap Room Info<span class="block text-[10px] font-normal mt-0.5">Name/Status + Items</span></div></label></div></div><div class="flex gap-3 pt-2"><button type="button" onclick="app.closeModal()" class="flex-1 py-3 text-gray-600 font-medium text-sm hover:bg-gray-100 rounded-xl transition">Cancel</button><button id="btn-swap-confirm" onclick="app.submitSwap('${sourceLoc.id}', document.getElementById('swap-select').value, document.querySelector('input[name=swapType]:checked').value)" class="flex-1 py-3 bg-indigo-600 text-white font-medium text-sm rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition flex justify-center items-center transform active:scale-95">Execute Swap</button></div></div></div>`;
+            } else if (type === 'addItems') {
+                const loc = state.locations.find(l => l.id === data.locationId);
+                const unassignedItems = state.inventory.filter(i => !i.locationId && !i.isDisposed);
+                const grouped = {};
+                unassignedItems.forEach(i => { if (!grouped[i.name]) grouped[i.name] = []; grouped[i.name].push(i); });
+                const list = Object.keys(grouped).length === 0 ? `<div class="text-center py-8 text-gray-400">No active items available in storage.</div>` : Object.keys(grouped).sort().map(name => {
+                    const items = grouped[name].sort((a,b) => a.equipmentId.localeCompare(b.equipmentId, undefined, {numeric: true}));
+                    const category = items[0].category;
+                    return `<div class="add-item-group mb-4 border border-gray-200 rounded-lg overflow-hidden" data-search="${name} ${category}"><div class="bg-gray-50 p-3 flex justify-between items-center border-b border-gray-200"><div><h4 class="font-bold text-sm text-gray-800">${name}</h4><p class="text-xs text-gray-500">${category} • ${items.length} Available</p></div><label class="flex items-center gap-2 text-xs font-bold text-blue-600 cursor-pointer select-none"><input type="checkbox" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" onchange="app.toggleSelectAll(this)"> Select All</label></div><div class="max-h-40 overflow-y-auto p-2 bg-white space-y-1 custom-scrollbar">${items.map(i => { const statusColor = i.condition === 'Defective' ? 'bg-red-500' : 'bg-green-500'; return `<label class="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer transition"><input type="checkbox" name="selectedItems" value="${i.id}" class="item-checkbox w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"><div class="w-2 h-2 rounded-full ${statusColor}"></div><span class="text-xs font-mono font-bold text-gray-600 bg-gray-100 px-1.5 rounded">${i.equipmentId}</span></label>`}).join('')}</div></div>`;
+                }).join('');
+                html = `<div class="bg-white rounded-2xl w-full max-w-lg h-[80vh] flex flex-col shadow-2xl pointer-events-auto animate-in border border-gray-100"><div class="p-5 border-b border-gray-100 flex justify-between items-center bg-white rounded-t-2xl"><div><h3 class="font-bold text-xl text-gray-800">Add Items</h3><p class="text-xs text-gray-500">To <strong>${loc ? loc.name : 'Location'}</strong></p></div><button onclick="app.closeModal()" class="bg-gray-50 p-2 rounded-full shadow-sm text-gray-400 hover:text-gray-600 transition"><i data-lucide="x" class="w-5 h-5"></i></button></div><div class="p-4 border-b border-gray-100 bg-gray-50/50"><div class="relative"><i data-lucide="search" class="absolute left-3 top-3 text-gray-400 w-4 h-4"></i><input placeholder="Search available items..." class="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" oninput="app.filterAddItems(event)"/></div></div><form onsubmit="app.submitAddItems(event, '${loc ? loc.id : ''}')" class="flex-1 overflow-hidden flex flex-col"><div class="flex-1 overflow-y-auto p-4 scroller">${list}</div><div class="p-4 border-t border-gray-100 bg-white rounded-b-2xl"><button type="submit" class="w-full py-3 bg-blue-600 text-white font-medium text-sm rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition flex justify-center items-center transform active:scale-[0.99]">Add Selected Items</button></div></form></div>`;
+            }
+
+            content.innerHTML = html;
+            container.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        // --- 2. GENERATORS ---
+
+        function generateDashboardView() {
+            const totalItems = state.inventory.filter(i => !i.isDisposed).length;
+            const disposedItems = state.inventory.filter(i => i.isDisposed).length;
+            const assignedItems = state.inventory.filter(i => !i.isDisposed && i.locationId).length;
+            const unassignedItems = totalItems - assignedItems;
+            
+            // Sub-Category Data for Chart
+            const subCategories = {};
+            state.inventory.filter(i => !i.isDisposed).forEach(i => {
+                const sub = i.subCategory || 'General';
+                subCategories[sub] = (subCategories[sub] || 0) + 1;
+            });
+            
+            const rooms = state.locations.filter(l => l.type === 'room');
+            const occupiedRooms = rooms.filter(r => r.status === 'occupied').length;
+            const vacantRooms = rooms.filter(r => r.status === 'vacant').length;
+            const maintenanceRooms = rooms.filter(r => r.status === 'maintenance').length;
+
+            return `
+            <div class="space-y-6 fade-in max-w-7xl mx-auto">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Active</p>
+                            <h3 class="text-2xl font-bold text-gray-800 mt-1">${totalItems}</h3>
+                        </div>
+                        <div class="p-3 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="package" class="w-6 h-6"></i></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Assigned</p>
+                            <h3 class="text-2xl font-bold text-gray-800 mt-1">${assignedItems}</h3>
+                        </div>
+                        <div class="p-3 bg-indigo-50 text-indigo-600 rounded-lg"><i data-lucide="map-pin" class="w-6 h-6"></i></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">In Storage</p>
+                            <h3 class="text-2xl font-bold text-gray-800 mt-1">${unassignedItems}</h3>
+                        </div>
+                        <div class="p-3 bg-orange-50 text-orange-600 rounded-lg"><i data-lucide="box" class="w-6 h-6"></i></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Pullout / Disposed</p>
+                            <h3 class="text-2xl font-bold text-gray-800 mt-1">${disposedItems}</h3>
+                        </div>
+                        <div class="p-3 bg-red-50 text-red-600 rounded-lg"><i data-lucide="trash-2" class="w-6 h-6"></i></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                        <h3 class="font-bold text-gray-800 mb-4">Room Occupancy</h3>
+                        <div class="grid grid-cols-3 gap-4 text-center">
+                            <div class="p-4 bg-green-50 rounded-lg border border-green-100">
+                                <span class="block text-2xl font-bold text-green-700">${vacantRooms}</span>
+                                <span class="text-xs font-medium text-green-600 uppercase">Vacant</span>
+                            </div>
+                            <div class="p-4 bg-red-50 rounded-lg border border-red-100">
+                                <span class="block text-2xl font-bold text-red-700">${occupiedRooms}</span>
+                                <span class="text-xs font-medium text-red-600 uppercase">Occupied</span>
+                            </div>
+                            <div class="p-4 bg-yellow-50 rounded-lg border border-yellow-100">
+                                <span class="block text-2xl font-bold text-yellow-700">${maintenanceRooms}</span>
+                                <span class="text-xs font-medium text-yellow-600 uppercase">Maintenance</span>
+                            </div>
+                        </div>
+                        <div class="mt-6">
+                            <h4 class="font-bold text-gray-800 mb-2">Top Sub-Categories</h4>
+                            <div class="space-y-3">
+                                ${Object.keys(subCategories).length > 0 ? Object.keys(subCategories)
+                                    .sort((a,b) => subCategories[b] - subCategories[a])
+                                    .slice(0, 5).map(cat => {
+                                    const count = subCategories[cat];
+                                    const pct = Math.round((count / totalItems) * 100);
+                                    return `
+                                    <div>
+                                        <div class="flex justify-between text-xs mb-1">
+                                            <span class="font-medium text-gray-600">${cat}</span>
+                                            <span class="text-gray-400">${count} items</span>
+                                        </div>
+                                        <div class="w-full bg-gray-100 rounded-full h-2">
+                                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${pct}%"></div>
+                                        </div>
+                                    </div>`;
+                                }).join('') : '<p class="text-sm text-gray-400 italic">No items yet.</p>'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex flex-col">
+                        <h3 class="font-bold text-gray-800 mb-4">Quick Actions</h3>
+                        <div class="space-y-3 flex-1">
+                            <button onclick="app.setActiveTab('storage'); setTimeout(() => app.openAddItemModal(), 100)" class="w-full py-3 px-4 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-medium flex items-center gap-3 transition">
+                                <div class="bg-blue-200 p-1.5 rounded-md"><i data-lucide="plus" class="w-4 h-4"></i></div>
+                                Add New Equipment
+                            </button>
+                            <button onclick="app.setActiveTab('floors'); setTimeout(() => app.openAddLocationModal('floor'), 100)" class="w-full py-3 px-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium flex items-center gap-3 transition">
+                                <div class="bg-indigo-200 p-1.5 rounded-md"><i data-lucide="layers" class="w-4 h-4"></i></div>
+                                Create New Floor
+                            </button>
+                            <button onclick="app.setActiveTab('boxes'); setTimeout(() => app.openAddLocationModal('box'), 100)" class="w-full py-3 px-4 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg text-sm font-medium flex items-center gap-3 transition">
+                                <div class="bg-orange-200 p-1.5 rounded-md"><i data-lucide="box" class="w-4 h-4"></i></div>
+                                Register New Box
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function generateStorageView() {
+            const activeClass = "border-blue-600 text-blue-600 bg-blue-50";
+            const inactiveClass = "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50";
+            return `
+                <div class="space-y-6 fade-in max-w-7xl mx-auto">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">Inventory Catalog</h2>
+                            <p class="text-sm text-gray-500">Master list of all items</p>
+                        </div>
+                        <button onclick="app.openAddItemModal()" class="bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow hover:bg-blue-700 transition">
+                            <i data-lucide="plus" class="w-4 h-4"></i> <span class="hidden sm:inline">Add New Item</span>
+                        </button>
+                    </div>
+                    <div class="flex border-b border-gray-200">
+                        <button onclick="app.setStorageMode('active')" class="flex-1 pb-3 text-sm font-medium border-b-2 transition ${state.storageViewMode === 'active' ? activeClass : inactiveClass}">
+                            Active Inventory
+                        </button>
+                        <button onclick="app.setStorageMode('disposal')" class="flex-1 pb-3 text-sm font-medium border-b-2 transition ${state.storageViewMode === 'disposal' ? 'border-red-500 text-red-600 bg-red-50' : inactiveClass}">
+                            Pullout / Disposal
+                        </button>
+                    </div>
+                    <div class="relative">
+                        <i data-lucide="search" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5"></i>
+                        <input id="search-input" type="text" placeholder="Search items..." class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm shadow-sm" oninput="app.handleSearch(event)" />
+                    </div>
+                    <div id="inventory-list" class="space-y-6">${generateInventoryItems()}</div>
+                </div>
+            `;
+        }
+
+        function generateFloorsView() {
+            const floors = state.locations.filter(l => l.type === 'floor').sort((a, b) => a.name.localeCompare(b.name));
+            
+            const header = `
+                <div class="flex justify-between items-center">
+                    <div><h2 class="text-2xl font-bold text-gray-800">Floors</h2><p class="text-sm text-gray-500">Building layout</p></div>
+                    <button onclick="app.openAddLocationModal('floor')" class="bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow hover:bg-indigo-700 transition"><i data-lucide="plus" class="w-4 h-4"></i> Add Floor</button>
+                </div>`;
+
+            let content = '';
+            if (floors.length === 0) {
+                content = `<div class="text-center py-20 bg-white rounded-xl border border-dashed border-gray-300 mt-6"><i data-lucide="layers" class="w-12 h-12 text-gray-300 mx-auto mb-3"></i><p class="text-gray-500 font-medium">No floors yet.</p></div>`;
+            } else {
+                content = floors.map(floor => {
+                    const rooms = state.locations.filter(l => l.type === 'room' && l.parentId === floor.id);
+                    rooms.sort((a, b) => (a.customId || a.name).localeCompare((b.customId || b.name), undefined, { numeric: true, sensitivity: 'base' }));
+                    const roomCards = rooms.length === 0 ? `<p class="text-sm text-gray-400 italic col-span-full py-4 text-center">No rooms here.</p>` : rooms.map(room => generateLocationCard(room, 'home', 'text-indigo-600', 'bg-white', 'border-indigo-100')).join('');
+                    return `<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6 mt-6">
+                        <div class="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
+                            <h3 class="font-bold text-gray-800 flex items-center gap-2 text-lg"><i data-lucide="layers" class="w-5 h-5 text-indigo-500"></i> ${floor.name} <button onclick="app.openEditLocationModal('${floor.id}')" class="text-gray-400 hover:text-blue-600 p-1 rounded-full transition"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button></h3>
+                            <button onclick="app.openAddLocationModal('room', '${floor.id}')" class="text-xs bg-white border border-gray-300 px-3 py-1.5 rounded-md text-gray-700 font-medium hover:bg-gray-50 transition shadow-sm">+ Add Room</button>
+                        </div>
+                        <div class="p-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">${roomCards}</div>
+                    </div>`;
+                }).join('');
+            }
+            
+            return `<div class="space-y-6 max-w-7xl mx-auto fade-in">${header}${content}</div>`;
+        }
+
+        function generateBoxesView() {
+            const boxes = state.locations.filter(l => l.type === 'box');
+            boxes.sort((a, b) => (a.customId || a.name).localeCompare((b.customId || b.name), undefined, { numeric: true, sensitivity: 'base' }));
+            
+            const header = `
+                <div class="flex justify-between items-center">
+                    <div><h2 class="text-2xl font-bold text-gray-800">Boxes</h2><p class="text-sm text-gray-500">Movable containers</p></div>
+                    <button onclick="app.openAddLocationModal('box')" class="bg-orange-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow hover:bg-orange-700 transition"><i data-lucide="plus" class="w-4 h-4"></i> Add Box</button>
+                </div>`;
+
+            let content = '';
+            if (boxes.length === 0) {
+                content = `<div class="text-center py-20 bg-white rounded-xl border border-dashed border-gray-300 mt-6"><i data-lucide="box" class="w-12 h-12 text-gray-300 mx-auto mb-3"></i><p class="text-gray-500 font-medium">No boxes yet.</p></div>`;
+            } else {
+                content = `<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-6">${boxes.map(box => generateLocationCard(box, 'box', 'text-orange-600', 'bg-white', 'border-orange-100')).join('')}</div>`;
+            }
+
+            return `<div class="space-y-6 max-w-7xl mx-auto fade-in">${header}${content}</div>`;
+        }
+
+        function generateActivityLogView() {
+            const logs = state.logs || []; 
+
+            if (logs.length === 0) {
+                return `<div class="flex flex-col items-center justify-center py-20 text-gray-400">
+                    <i data-lucide="clipboard-list" class="w-16 h-16 mb-4 opacity-20"></i>
+                    <p>No activity recorded yet.</p>
+                </div>`;
+            }
+
+            return `
+            <div class="space-y-4 fade-in max-w-7xl mx-auto">
+                <h2 class="text-2xl font-bold text-gray-800">Activity Log</h2>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="divide-y divide-gray-100">
+                        ${logs.map(log => {
+                            const date = new Date(log.timestamp).toLocaleString();
+                            let icon = 'info';
+                            let colorClass = 'text-gray-500 bg-gray-100';
+
+                            if (log.action.includes('Added')) { icon = 'plus-circle'; colorClass = 'text-green-600 bg-green-50'; }
+                            else if (log.action.includes('Deleted')) { icon = 'trash-2'; colorClass = 'text-red-600 bg-red-50'; }
+                            else if (log.action.includes('Moved')) { icon = 'arrow-right-left'; colorClass = 'text-blue-600 bg-blue-50'; }
+                            else if (log.action.includes('Renamed')) { icon = 'edit-2'; colorClass = 'text-orange-600 bg-orange-50'; }
+                            else if (log.action.includes('Swap')) { icon = 'refresh-cw'; colorClass = 'text-purple-600 bg-purple-50'; }
+
+                            return `
+                            <div class="p-4 flex gap-4 hover:bg-gray-50 transition">
+                                <div class="mt-1">
+                                    <div class="p-2 rounded-full ${colorClass}">
+                                        <i data-lucide="${icon}" class="w-4 h-4"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="flex justify-between items-start">
+                                        <h4 class="font-bold text-sm text-gray-900">${log.action}</h4>
+                                        <span class="text-xs text-gray-400 whitespace-nowrap ml-2">${date}</span>
+                                    </div>
+                                    <p class="text-sm text-gray-600 mt-1 whitespace-pre-line">${log.details}</p>
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function generateSettingsView() {
+            const tabClass = (isActive) => isActive ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50/50" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50";
+            
+            return `
+            <div class="max-w-5xl mx-auto space-y-6 fade-in pb-10">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200 pb-4 gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800">System Settings</h2>
+                        <p class="text-sm text-gray-500">Manage categories, locations, and reports</p>
+                    </div>
+                    <div class="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+                        <button onclick="app.setSettingsTab('categories')" class="px-4 py-2 rounded-md text-sm font-medium transition ${state.settingsTab === 'categories' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">Categories</button>
+                        <button onclick="app.setSettingsTab('locations')" class="px-4 py-2 rounded-md text-sm font-medium transition ${state.settingsTab === 'locations' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">Locations</button>
+                        <button onclick="app.setSettingsTab('reports')" class="px-4 py-2 rounded-md text-sm font-medium transition ${state.settingsTab === 'reports' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">Reports</button>
+                    </div>
+                </div>
+
+                ${state.settingsTab === 'categories' ? generateCategorySettings() : 
+                  state.settingsTab === 'locations' ? generateLocationSettings() : 
+                  generateReportSettings()}
+            </div>`;
+        }
+
+        function generateReportSettings() {
+            return `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="bg-red-100 p-2.5 rounded-lg text-red-600">
+                            <i data-lucide="file-text" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-800">Generate PDF Report</h3>
+                            <p class="text-sm text-gray-500">Select content to include in the document</p>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4 mb-8">
+                        <label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <input type="checkbox" id="report-summary" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
+                            <div>
+                                <span class="font-bold text-gray-700 text-sm block">Executive Summary</span>
+                                <span class="text-xs text-gray-400">Dashboard statistics and charts</span>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <input type="checkbox" id="report-inventory" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
+                            <div>
+                                <span class="font-bold text-gray-700 text-sm block">Full Inventory List</span>
+                                <span class="text-xs text-gray-400">Detailed list of all active items</span>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <input type="checkbox" id="report-locations" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
+                            <div>
+                                <span class="font-bold text-gray-700 text-sm block">Location Status</span>
+                                <span class="text-xs text-gray-400">Room occupancy and floor details</span>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <input type="checkbox" id="report-logs" class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
+                            <div>
+                                <span class="font-bold text-gray-700 text-sm block">Activity Logs</span>
+                                <span class="text-xs text-gray-400">Recent system actions (Last 50)</span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <button onclick="app.generatePDF()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg shadow-blue-200 transition flex items-center justify-center gap-2">
+                        <i data-lucide="download" class="w-5 h-5"></i> Download PDF Report
+                    </button>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-100 rounded-xl p-6 flex flex-col justify-center items-center text-center">
+                    <img src="https://illustrations.popsy.co/amber/success.svg" class="w-48 h-48 mb-6 opacity-80" alt="Report Illustration">
+                    <h3 class="text-xl font-bold text-blue-900 mb-2">Professional Reporting</h3>
+                    <p class="text-sm text-blue-700 max-w-xs">Generate clean, branded PDF reports for audits, inventory checks, or management reviews with a single click.</p>
+                </div>
+            </div>
+            `;
+        }
+
+        function generateCategorySettings() {
+            const categories = state.masterData.categories || [];
+            if (categories.length === 0) {
+                 return `<div class="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
+                    <p class="text-gray-500 mb-4">No categories defined.</p>
+                    <button onclick="app.openManageCategoryModal('add')" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">Create First Category</button>
+                 </div>`;
+            }
+
+            return `
+            <div class="grid grid-cols-1 gap-6">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-gray-800">All Categories</h3>
+                    <button onclick="app.openManageCategoryModal('add')" class="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow hover:bg-blue-700 transition"><i data-lucide="plus" class="w-4 h-4"></i> New Category</button>
+                </div>
+                <div class="space-y-4">
+                    ${categories.map(cat => `
+                        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                            <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center group">
+                                <div class="font-bold text-gray-800 flex items-center gap-2"><i data-lucide="folder" class="w-4 h-4 text-blue-500"></i> ${cat.name}</div>
+                                <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                                    <button onclick="app.openManageCategoryModal('rename', '${window.esc(cat.name)}')" class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-white rounded-md transition" title="Rename"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                                    <button onclick="app.deleteMasterCategory('${window.esc(cat.name)}')" class="p-1.5 text-gray-500 hover:text-red-600 hover:bg-white rounded-md transition" title="Delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                </div>
+                            </div>
+                            <div class="p-4">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    ${cat.subs && cat.subs.length > 0 ? cat.subs.map(sub => `
+                                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100 group/sub hover:border-blue-200 transition">
+                                            <span class="text-sm font-medium text-gray-700">${sub}</span>
+                                            <div class="flex gap-1 opacity-0 group-hover/sub:opacity-100 transition">
+                                                <button onclick="app.openMoveSubCategoryModal('${window.esc(sub)}', '${window.esc(cat.name)}')" class="p-1 text-gray-400 hover:text-orange-600" title="Move Category"><i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i></button>
+                                                <button onclick="app.openManageSubCategoryModal('rename', '${window.esc(cat.name)}', '${window.esc(sub)}')" class="p-1 text-gray-400 hover:text-blue-600" title="Rename"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                                                <button onclick="app.deleteMasterSubCategory('${window.esc(cat.name)}', '${window.esc(sub)}')" class="p-1 text-gray-400 hover:text-red-600" title="Delete"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+                                            </div>
+                                        </div>
+                                    `).join('') : '<span class="text-sm text-gray-400 italic">No sub-categories</span>'}
+                                    <button onclick="app.openManageSubCategoryModal('add', '${window.esc(cat.name)}')" class="flex items-center justify-center gap-2 p-3 border border-dashed border-gray-300 rounded-lg text-gray-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition text-sm font-medium">
+                                        <i data-lucide="plus" class="w-4 h-4"></i> Add Sub-Category
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+        }
+
+        function generateLocationSettings() {
+             const floors = state.locations.filter(l => l.type === 'floor').sort((a,b) => a.name.localeCompare(b.name));
+             const boxes = state.locations.filter(l => l.type === 'box').sort((a,b) => a.name.localeCompare(b.name));
+
+             return `
+             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Floors & Rooms -->
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-gray-800">Floors & Rooms</h3>
+                        <button onclick="app.openAddLocationModal('floor')" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100 transition">+ Add Floor</button>
+                    </div>
+                    <div class="space-y-4">
+                        ${floors.map(floor => {
+                            const rooms = state.locations.filter(l => l.parentId === floor.id).sort((a,b) => a.name.localeCompare(b.name));
+                            return `
+                            <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                                <div class="bg-gray-50 px-3 py-2 border-b border-gray-200 flex justify-between items-center">
+                                    <span class="font-bold text-gray-800 text-sm flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4 text-indigo-500"></i> ${floor.name}</span>
+                                    <div class="flex gap-1">
+                                        <button onclick="app.openAddLocationModal('room', '${floor.id}')" class="text-xs bg-white border border-gray-300 px-2 py-0.5 rounded text-gray-600 hover:bg-gray-50">+ Room</button>
+                                        <button onclick="app.openEditLocationModal('${floor.id}')" class="text-gray-400 hover:text-blue-600 p-1"><i data-lucide="settings-2" class="w-3.5 h-3.5"></i></button>
+                                    </div>
+                                </div>
+                                <div class="p-2 space-y-1">
+                                    ${rooms.length > 0 ? rooms.map(room => `
+                                        <div class="flex justify-between items-center p-2 rounded hover:bg-gray-50 group">
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-1.5 h-1.5 rounded-full ${room.status === 'occupied' ? 'bg-red-500' : (room.status === 'maintenance' ? 'bg-yellow-500' : 'bg-green-500')}"></div>
+                                                <span class="text-sm text-gray-700">${room.name}</span>
+                                                <span class="text-[10px] text-gray-400 font-mono border px-1 rounded">${room.customId || 'N/A'}</span>
+                                            </div>
+                                            <button onclick="app.openEditLocationModal('${room.id}')" class="text-gray-300 hover:text-blue-600 p-1 opacity-0 group-hover:opacity-100 transition"><i data-lucide="pencil" class="w-3 h-3"></i></button>
+                                        </div>
+                                    `).join('') : '<div class="p-2 text-xs text-gray-400 italic text-center">No rooms</div>'}
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+
+                <!-- Boxes -->
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-gray-800">Boxes & Containers</h3>
+                        <button onclick="app.openAddLocationModal('box')" class="px-3 py-1.5 bg-orange-50 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-100 transition">+ Add Box</button>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-xl p-4">
+                        ${boxes.length > 0 ? `<div class="grid grid-cols-2 gap-3">
+                            ${boxes.map(box => `
+                                <div class="flex justify-between items-center p-2 border border-gray-100 rounded-lg hover:border-orange-200 group">
+                                    <div class="flex items-center gap-2">
+                                        <i data-lucide="box" class="w-4 h-4 text-orange-500"></i>
+                                        <span class="text-sm font-medium text-gray-700 truncate">${box.name}</span>
+                                    </div>
+                                    <button onclick="app.openEditLocationModal('${box.id}')" class="text-gray-300 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                                </div>
+                            `).join('')}
+                        </div>` : '<div class="text-center py-8 text-gray-400 italic">No boxes registered.</div>'}
+                    </div>
+                </div>
+             </div>`;
+        }
+
+        function generateInventoryItems() {
+            const term = state.searchTerm.toLowerCase();
+            const isDisposalMode = state.storageViewMode === 'disposal';
+            
+            let filtered = state.inventory.filter(item => {
+                const matchesMode = isDisposalMode ? item.isDisposed : !item.isDisposed;
+                const matchesTerm = item.name.toLowerCase().includes(term) ||
+                    item.equipmentId.toLowerCase().includes(term) ||
+                    (item.category && item.category.toLowerCase().includes(term));
+                return matchesMode && matchesTerm;
+            });
+
+            if (filtered.length === 0 && (state.masterData.categories || []).length === 0) {
+                const emptyMsg = isDisposalMode ? "Pullout bin is empty." : "No active items found.";
+                return `<div class="flex flex-col items-center justify-center py-20 text-gray-400"><i data-lucide="${isDisposalMode ? 'trash-2' : 'package-open'}" class="w-16 h-16 mb-4 opacity-20"></i><p>${emptyMsg}</p></div>`;
+            }
+
+            // --- Structure Building Logic (Modified to include empty Master Data categories) ---
+            const grouped = {};
+
+            // 1. Initialize structure from Master Data (if Active mode)
+            if (!isDisposalMode) {
+                (state.masterData.categories || []).forEach(cat => {
+                    grouped[cat.name] = {};
+                    if(cat.subs) {
+                        cat.subs.forEach(sub => {
+                            grouped[cat.name][sub] = {};
+                        });
+                    }
+                });
+            }
+
+            // 2. Populate with actual inventory items
+            filtered.forEach(item => {
+                const cat = item.category || 'Uncategorized';
+                const sub = item.subCategory || 'General';
+                const name = item.name || 'Unnamed';
+                
+                if (!grouped[cat]) grouped[cat] = {};
+                if (!grouped[cat][sub]) grouped[cat][sub] = {};
+                if (!grouped[cat][sub][name]) grouped[cat][sub][name] = [];
+                grouped[cat][sub][name].push(item);
+            });
+
+            let html = '';
+            
+            Object.keys(grouped).sort().forEach(cat => {
+                const subKeys = Object.keys(grouped[cat]).sort();
+                // Render category block
+                html += `<div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm mb-4">`;
+                html += `<div class="bg-gray-50 px-4 py-3 border-b border-gray-200 font-bold text-gray-700 flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-1"><i data-lucide="folder" class="w-4 h-4 text-blue-500"></i> ${cat}</div>
+                    ${!isDisposalMode ? `<div class="flex gap-1">
+                        <button onclick="app.openRenameModal('category', '${window.esc(cat)}')" class="text-gray-300 hover:text-blue-500 p-1 rounded transition" title="Rename"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                    </div>` : ''}
+                </div>`;
+                html += `<div class="p-4 space-y-4">`;
+                
+                if (subKeys.length === 0) {
+                     html += `<div class="text-xs text-gray-400 italic">No sub-categories defined.</div>`;
+                }
+
+                subKeys.forEach(sub => {
+                    const itemNames = Object.keys(grouped[cat][sub]).sort();
+                    
+                    html += `<div class="space-y-3">`;
+                    html += `<h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 group/sub">
+                        <span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span> ${sub}
+                        ${!isDisposalMode ? `
+                        <button onclick="app.openAddItemModal({category: '${window.esc(cat)}', subCategory: '${window.esc(sub)}'})" class="text-gray-300 hover:text-blue-600 p-1 rounded transition opacity-0 group-hover/sub:opacity-100" title="Add New Item to ${sub}"><i data-lucide="plus-circle" class="w-3.5 h-3.5"></i></button>
+                        <button onclick="app.openRenameModal('subCategory', '${window.esc(sub)}', '${window.esc(cat)}')" class="text-gray-300 hover:text-blue-500 p-1 rounded transition opacity-0 group-hover/sub:opacity-100" title="Rename"><i data-lucide="pencil" class="w-3 h-3"></i></button>
+                        ` : ''}
+                    </h4>`;
+                    
+                    if (itemNames.length === 0) {
+                        html += `<div class="text-xs text-gray-300 italic pl-4 py-2 border border-dashed border-gray-200 rounded">No items in this category yet.</div>`;
+                    } else {
+                        html += `<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">`;
+                        
+                        itemNames.forEach(name => {
+                            const items = grouped[cat][sub][name];
+                            items.sort((a,b) => a.equipmentId.localeCompare(b.equipmentId, undefined, {numeric: true}));
+                            
+                            const stockCount = items.filter(i => !i.locationId).length;
+                            const totalCount = items.length;
+                            const hasStock = stockCount > 0;
+                            
+                            const cardBg = hasStock || isDisposalMode ? "bg-white" : "bg-gray-50 opacity-90";
+                            const badgeColor = hasStock ? "bg-blue-100 text-blue-700" : (isDisposalMode ? "bg-red-100 text-red-700" : "bg-gray-200 text-gray-600");
+                            const badgeText = isDisposalMode ? `${totalCount} Pulled Out` : (hasStock ? `${stockCount} In Stock` : `No Stock (0/${totalCount})`);
+
+                            let itemsListHtml = '';
+                            const itemsToShow = items; 
+
+                            if (itemsToShow.length > 0) {
+                                itemsListHtml = itemsToShow.map((i, index) => {
+                                    const statusColor = i.condition === 'Defective' ? 'bg-red-500' : 'bg-green-500';
+                                    const isLastItem = index === itemsToShow.length - 1;
+
+                                    let actionButtons = '';
+                                    if (!isDisposalMode) {
+                                        actionButtons = `
+                                            <button onclick="app.openMoveItemModal('${i.id}')" class="text-gray-400 hover:text-blue-600 p-1" title="Move Location">
+                                                <i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i>
+                                            </button>
+                                            ${isLastItem ? `
+                                            <button onclick="app.deleteItem('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', false)" class="text-gray-300 hover:text-red-500 p-1" title="Delete (Reuse ID)">
+                                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                            </button>` : '<span class="w-5.5 inline-block"></span>'} 
+                                            `;
+                                    } else {
+                                        actionButtons = `
+                                            <button onclick="app.toggleDisposal('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', true)" class="text-green-600 hover:text-green-800 p-1" title="Restore to Inventory">
+                                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                                            </button>
+                                            <button onclick="app.deleteItem('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', true)" class="text-red-400 hover:text-red-700 p-1" title="Delete Permanently">
+                                                <i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
+                                            </button>`;
+                                    }
+
+                                    return `
+                                    <div class="flex justify-between items-center text-xs p-2 bg-gray-50 rounded border border-gray-100 hover:border-blue-200 transition group/item">
+                                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                                            <button onclick="app.toggleCondition('${i.id}', '${i.condition || 'Working'}')" class="w-2.5 h-2.5 rounded-full ${statusColor} hover:scale-125 transition flex-none" title="${i.condition || 'Working'} (Click to toggle)"></button>
+                                            <span class="font-mono font-bold text-blue-600 flex-none">${i.equipmentId}</span>
+                                            ${!isDisposalMode ? `<div class="truncate pl-2 text-[10px] text-right flex-1">${getLocationName(i.locationId)}</div>` : ''}
+                                        </div>
+                                        <div class="flex gap-1 pl-2 transition">
+                                            ${actionButtons}
+                                        </div>
+                                    </div>
+                                `}).join('');
+                            } else {
+                                itemsListHtml = `<div class="text-xs text-gray-400 italic text-center py-2">No items listed</div>`;
+                            }
+
+                            html += `
+                            <div class="${cardBg} border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 flex flex-col h-full relative group/card">
+                                <div class="flex justify-between items-start mb-3 pb-2 border-b border-gray-100">
+                                    <div>
+                                        <h3 class="font-bold text-gray-900 text-sm leading-tight pr-2 flex items-center gap-1">
+                                            ${name}
+                                        </h3>
+                                        <span class="${badgeColor} text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1">${badgeText}</span>
+                                    </div>
+                                    ${!isDisposalMode ? `<button onclick="app.openAddStockModal('${window.esc(cat)}', '${window.esc(sub)}', '${window.esc(name)}')" class="text-blue-600 hover:bg-blue-50 p-1 rounded-full transition" title="Add Stock"><i data-lucide="plus-circle" class="w-5 h-5"></i></button>` : ''}
+                                </div>
+                                <div class="flex-1 overflow-y-auto max-h-48 space-y-1 custom-scrollbar pr-1">${itemsListHtml}</div>
+                            </div>`;
+                        });
+                        html += `</div>`;
+                    }
+                    html += `</div>`;
+                });
+                html += `</div></div>`;
+            });
+            return html;
+        }
+
+        // --- Global App Object ---
+        window.app = {
+            setActiveTab: (tab) => {
+                state.activeTab = tab;
+                updateNavUI();
+                renderMainContent();
+            },
+            setStorageMode: (mode) => {
+                state.storageViewMode = mode;
+                renderMainContent();
+            },
+            setSettingsTab: (tab) => {
+                state.settingsTab = tab;
+                renderMainContent();
+            },
+            openAddItemModal: (data) => renderModal('addItem', data),
+            openAddLocationModal: (type, parentId) => renderModal('addLocation', { type, parentId }),
+            openEditLocationModal: (locationId) => renderModal('editLocation', { locationId }),
+            openMoveItemModal: (itemId) => renderModal('moveItem', { itemId }),
+            openLocationDetail: (locationId) => renderModal('locationDetail', { locationId }),
+            openSwapModal: (locationId) => renderModal('swapContents', { locationId }),
+            openRenameModal: (type, currentVal, parentCat, parentSub) => renderModal('rename', { type, currentVal, parentCat, parentSub }),
+            openAddStockModal: (category, subCategory, name) => renderModal('addStock', { category, subCategory, name }),
+            openAddItemsModal: (locationId) => renderModal('addItems', { locationId }),
+            handleFileUpload: (e) => {
+                 const file = e.target.files[0];
+                 if (!file) return;
+                 
+                 Papa.parse(file, {
+                     header: true,
+                     skipEmptyLines: true,
+                     complete: async (results) => {
+                         const rows = results.data;
+                         if (!rows || rows.length === 0) return;
+                         
+                         let added = 0;
+                         const batch = writeBatch(db);
+                         
+                         // Expect headers: Equipment ID, Name, Category, Sub-Category, Location, Quantity, Status
+                         rows.forEach(row => {
+                             const id = row['Equipment ID'] || row['ID'] || `IMP-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+                             
+                             // Skip if exists
+                             if (state.inventory.some(i => i.equipmentId === id)) return;
+                             
+                             const newItem = {
+                                 equipmentId: id,
+                                 name: row['Name'] || row['Item Name'] || 'Imported Item',
+                                 category: row['Category'] || 'Uncategorized',
+                                 subCategory: row['Sub-Category'] || 'General',
+                                 condition: row['Condition'] || 'Working',
+                                 locationId: null, // Basic import goes to storage
+                                 isDisposed: false,
+                                 createdAt: new Date().toISOString()
+                             };
+                             
+                             const ref = doc(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'));
+                             batch.set(ref, newItem);
+                             added++;
+                         });
+                         
+                         if(added > 0) {
+                             await batch.commit();
+                             showToast(`Imported ${added} items successfully`);
+                             app.setActiveTab('storage');
+                         } else {
+                             alert("No new items found or invalid CSV format.");
+                         }
+                     }
+                 });
+            },
+            triggerImport: () => document.getElementById('csv-upload').click(),
+            
+            // Settings Modals
+            openManageCategoryModal: (action, name) => renderModal('manageCategory', { action, name }),
+            openManageSubCategoryModal: (action, parentCat, name) => renderModal('manageSubCategory', { action, parentCat, name }),
+            openMoveSubCategoryModal: (subName, currentParent) => renderModal('moveSubCategory', { subName, currentParent }),
+
+            updateSubCategoryOptions: (category) => {
+                const subSelect = document.getElementById('input-subcategory');
+                subSelect.innerHTML = '<option value="" disabled selected>Select...</option>';
+                const catObj = state.masterData.categories.find(c => c.name === category);
+                if (catObj && catObj.subs) {
+                    catObj.subs.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s;
+                        opt.innerText = s;
+                        subSelect.appendChild(opt);
+                    });
+                }
+            },
+
+            // Modal Controls
+            closeModal: () => {
+                state.currentModal = null;
+                document.getElementById('modal-container').classList.add('hidden');
+                document.getElementById('modal-content').innerHTML = '';
+            },
+            
+            // Confirm Modal Controls
+            openConfirmModal: (msg, actionFn) => {
+                state.pendingAction = actionFn;
+                document.getElementById('confirm-message').innerText = msg;
+                document.getElementById('confirm-modal').classList.remove('hidden');
+            },
+            closeConfirmModal: () => {
+                state.pendingAction = null;
+                document.getElementById('confirm-modal').classList.add('hidden');
+            },
+            executePendingAction: async () => {
+                if (state.pendingAction) {
+                    await state.pendingAction();
+                }
+                app.closeConfirmModal();
+            },
+
+            handleSearch: (e) => {
+                state.searchTerm = e.target.value;
+                renderStorageList(); 
+            },
+            filterAddItems: (e) => {
+                const term = e.target.value.toLowerCase();
+                const groups = document.querySelectorAll('.add-item-group');
+                groups.forEach(g => {
+                    const text = g.dataset.search.toLowerCase();
+                    g.style.display = text.includes(term) ? 'block' : 'none';
+                });
+            },
+            toggleSelectAll: (checkbox) => {
+                const group = checkbox.closest('.add-item-group');
+                const inputs = group.querySelectorAll('.item-checkbox');
+                inputs.forEach(input => input.checked = checkbox.checked);
+            },
+            generateIdFromSubCategory: (subCategory) => {
+                if (!subCategory) return;
+                let prefix = subCategory.split(' ').map(word => word[0]).join('').toUpperCase();
+                if (prefix.length < 2) prefix = subCategory.substring(0, 2).toUpperCase();
+                
+                const newId = app.generateNextId(prefix);
+                const idInput = document.getElementById('input-equipment-id');
+                if (idInput) idInput.value = newId;
+            },
+
+            // SMART ID GENERATOR: Skips permanently retired IDs
+            generateNextId: (rawPrefix) => {
+                // Remove trailing dash if present to avoid double dash in regex
+                const prefix = rawPrefix.endsWith('-') ? rawPrefix.slice(0, -1) : rawPrefix;
+                
+                const regex = new RegExp(`^${prefix}-(\\d+)$`);
+
+                // 1. Get numbers from active inventory
+                const inventoryNumbers = state.inventory
+                    .filter(i => i.equipmentId && i.equipmentId.match(regex))
+                    .map(i => parseInt(i.equipmentId.match(regex)[1], 10));
+
+                // 2. Get numbers from retired IDs (Pullout deletions)
+                const retiredNumbers = (state.masterData.retiredIds || [])
+                    .filter(id => id.match(regex))
+                    .map(id => parseInt(id.match(regex)[1], 10));
+
+                // 3. Combine into a set of "unavailable" numbers
+                const usedNumbers = new Set([...inventoryNumbers, ...retiredNumbers]);
+
+                // 4. Find the first gap (smallest number starting from 1 that isn't used)
+                let nextNum = 1;
+                while (usedNumbers.has(nextNum)) {
+                    nextNum++;
+                }
+
+                return `${prefix}-${String(nextNum).padStart(4, '0')}`;
+            },
+
+            // --- PDF GENERATION ---
+            generatePDF: () => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                const now = new Date();
+                const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+
+                // Corporate Colors
+                const darkBlue = [26, 54, 93]; 
+                const slateGray = [100, 116, 139];
+                const lightGray = [241, 245, 249];
+
+                // --- HEADER ---
+                doc.setFillColor(...darkBlue);
+                doc.rect(0, 0, 210, 40, 'F');
+                
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(24);
+                doc.setFont('helvetica', 'bold');
+                doc.text("INVENTORY REPORT", 14, 25);
+                
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`Generated: ${dateStr}`, 14, 33);
+
+                let yPos = 55;
+
+                // --- SELECTIONS ---
+                const includeSummary = document.getElementById('report-summary').checked;
+                const includeInventory = document.getElementById('report-inventory').checked;
+                const includeLocations = document.getElementById('report-locations').checked;
+                const includeLogs = document.getElementById('report-logs').checked;
+
+                // --- 1. EXECUTIVE SUMMARY ---
+                if (includeSummary) {
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text("EXECUTIVE SUMMARY", 14, yPos);
+                    doc.setDrawColor(...slateGray);
+                    doc.line(14, yPos + 2, 196, yPos + 2);
+                    yPos += 15;
+
+                    // Metrics
+                    const totalItems = state.inventory.filter(i => !i.isDisposed).length;
+                    const assigned = state.inventory.filter(i => !i.isDisposed && i.locationId).length;
+                    const storage = totalItems - assigned;
+                    const disposed = state.inventory.filter(i => i.isDisposed).length;
+                    
+                    // Room Stats
+                    const rooms = state.locations.filter(l => l.type === 'room');
+                    const vacant = rooms.filter(r => r.status === 'vacant').length;
+                    const occupied = rooms.filter(r => r.status === 'occupied').length;
+                    const maintenance = rooms.filter(r => r.status === 'maintenance').length;
+
+                    // Top Sub-Categories
+                    const subCounts = {};
+                    state.inventory.filter(i => !i.isDisposed).forEach(i => {
+                        const sub = i.subCategory || 'General';
+                        subCounts[sub] = (subCounts[sub] || 0) + 1;
+                    });
+                    const topSubs = Object.entries(subCounts)
+                        .sort((a,b) => b[1] - a[1])
+                        .slice(0, 5)
+                        .map(([k,v]) => `${k}: ${v}`)
+                        .join(', ');
+
+                    const summaryData = [
+                        ['Total Active Assets', totalItems, 'Vacant Rooms', vacant],
+                        ['In Storage', storage, 'Occupied Rooms', occupied],
+                        ['Assigned / Deployed', assigned, 'Under Maintenance', maintenance],
+                        ['Disposed / Retired', disposed, 'Top Categories', topSubs]
+                    ];
+
+                    doc.autoTable({
+                        startY: yPos,
+                        body: summaryData,
+                        theme: 'grid',
+                        styles: { fontSize: 9, cellPadding: 4, lineColor: [200, 200, 200] },
+                        columnStyles: {
+                            0: { fontStyle: 'bold', fillColor: lightGray, cellWidth: 40 },
+                            2: { fontStyle: 'bold', fillColor: lightGray, cellWidth: 40 }
+                        },
+                        margin: { left: 14, right: 14 }
+                    });
+                    
+                    yPos = doc.lastAutoTable.finalY + 20;
+                }
+
+                // --- 2. FULL INVENTORY (Grouped) ---
+                if (includeInventory) {
+                    if (yPos > 240) { doc.addPage(); yPos = 20; }
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text("FULL INVENTORY LIST", 14, yPos);
+                    doc.line(14, yPos + 2, 196, yPos + 2);
+                    yPos += 10;
+
+                    // Group Items: Category -> Sub-Category -> Items
+                    const grouped = {};
+                    state.inventory.filter(i => !i.isDisposed).forEach(i => {
+                        if(!grouped[i.category]) grouped[i.category] = {};
+                        if(!grouped[i.category][i.subCategory]) grouped[i.category][i.subCategory] = [];
+                        grouped[i.category][i.subCategory].push(i);
+                    });
+
+                    // Flatten for table, inserting headers
+                    const tableRows = [];
+                    Object.keys(grouped).sort().forEach(cat => {
+                        // Category Header Row
+                        tableRows.push([{ content: cat.toUpperCase(), colSpan: 5, styles: { fillColor: [226, 232, 240], fontStyle: 'bold', textColor: [0,0,0] } }]);
+                        
+                        Object.keys(grouped[cat]).sort().forEach(sub => {
+                            // Sub-Category Header Row
+                            tableRows.push([{ content: `   ${sub}`, colSpan: 5, styles: { fillColor: [248, 250, 252], fontStyle: 'bold', textColor: [100,100,100] } }]);
+                            
+                            const items = grouped[cat][sub].sort((a,b) => a.equipmentId.localeCompare(b.equipmentId, undefined, {numeric: true}));
+                            items.forEach(item => {
+                                const locName = item.locationId ? getLocationNamePlain(item.locationId) : 'Storage';
+                                tableRows.push([
+                                    item.equipmentId,
+                                    item.name,
+                                    locName,
+                                    item.condition,
+                                    item.quantity || 1
+                                ]);
+                            });
+                        });
+                    });
+
+                    doc.autoTable({
+                        startY: yPos,
+                        head: [['ID', 'Item Name', 'Location', 'Condition', 'Qty']],
+                        body: tableRows,
+                        theme: 'plain',
+                        headStyles: { fillColor: darkBlue, textColor: 255 },
+                        styles: { fontSize: 8, cellPadding: 2 },
+                        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 30 } },
+                        margin: { left: 14, right: 14 }
+                    });
+                    yPos = doc.lastAutoTable.finalY + 20;
+                }
+
+                // --- 3. LOCATION STATUS (Detailed Assets) ---
+                if (includeLocations) {
+                    if (yPos > 250) { doc.addPage(); yPos = 20; }
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text("LOCATION STATUS REPORT", 14, yPos);
+                    doc.line(14, yPos + 2, 196, yPos + 2);
+                    yPos += 10;
+
+                    const locRows = state.locations.filter(l => l.type === 'room').sort((a,b) => a.name.localeCompare(b.name)).map(l => {
+                        // Aggregate items in this room
+                        const roomItems = state.inventory.filter(i => i.locationId === l.id);
+                        const subCounts = {};
+                        roomItems.forEach(i => {
+                            const sub = i.subCategory || 'General';
+                            subCounts[sub] = (subCounts[sub] || 0) + 1;
+                        });
+                        
+                        // Format detailed string (e.g., "Cameras: 2, Lenses: 1")
+                        const assetDetails = Object.keys(subCounts).length > 0 
+                            ? Object.entries(subCounts).map(([k,v]) => `${k}: ${v}`).join('\n') 
+                            : 'Empty';
+
+                        return [
+                            l.customId || 'N/A', 
+                            l.name, 
+                            l.status ? l.status.toUpperCase() : 'UNKNOWN', 
+                            assetDetails
+                        ];
+                    });
+
+                    doc.autoTable({
+                        startY: yPos,
+                        head: [['Room ID', 'Name', 'Status', 'Assets Breakdown']],
+                        body: locRows,
+                        theme: 'grid',
+                        headStyles: { fillColor: darkBlue, textColor: 255 },
+                        styles: { fontSize: 9, cellPadding: 3, valign: 'middle' },
+                        columnStyles: { 3: { fontSize: 8 } },
+                        margin: { left: 14, right: 14 }
+                    });
+                    yPos = doc.lastAutoTable.finalY + 20;
+                }
+
+                // --- 4. ACTIVITY LOGS ---
+                if (includeLogs) {
+                    doc.addPage();
+                    yPos = 20;
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text("SYSTEM ACTIVITY LOGS", 14, yPos);
+                    doc.line(14, yPos + 2, 196, yPos + 2);
+                    yPos += 10;
+
+                    const logRows = state.logs.slice(0, 50).map(l => {
+                        return [new Date(l.timestamp).toLocaleString(), l.action, l.details];
+                    });
+
+                    doc.autoTable({
+                        startY: yPos,
+                        head: [['Timestamp', 'Action', 'Details']],
+                        body: logRows,
+                        theme: 'striped',
+                        headStyles: { fillColor: slateGray, textColor: 255 },
+                        styles: { fontSize: 8, cellPadding: 2 },
+                        columnStyles: { 0: { cellWidth: 40 }, 1: { fontStyle: 'bold', cellWidth: 40 } },
+                        margin: { left: 14, right: 14 }
+                    });
+                }
+
+                // --- FOOTER (Page Numbers) ---
+                const pageCount = doc.internal.getNumberOfPages();
+                for(let i = 1; i <= pageCount; i++) {
+                    doc.setPage(i);
+                    doc.setFontSize(8);
+                    doc.setTextColor(150);
+                    doc.text(`Page ${i} of ${pageCount}`, 196, 285, { align: 'right' });
+                }
+
+                doc.save(`Equipment_Report_${now.toISOString().slice(0,10)}.pdf`);
+                showToast("PDF Report Generated");
+            },
+
+            submitAddItem: async (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const quantity = parseInt(form.quantity.value) || 1;
+                let currentIdString = form.equipmentId.value.trim().toUpperCase(); 
+
+                // Regex to split "CAM-001" into "CAM-" and "001" or "CAM" and "001"
+                const match = currentIdString.match(/^(.*?)(\d+)$/);
+                
+                // Fallback for non-numeric IDs or if no number found
+                if (!match) {
+                    if (quantity > 1) {
+                        alert("To add multiple items, the ID must end with a number.");
+                        return;
+                    }
+                    // Simple check for single item
+                    if (state.inventory.some(i => i.equipmentId === currentIdString) || (state.masterData.retiredIds || []).includes(currentIdString)) {
+                         alert(`ID "${currentIdString}" is unavailable (Active or Retired).`);
+                         return;
+                    }
+                    
+                    // Create single item logic
+                    try {
+                        const ref = doc(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'));
+                        await setDoc(ref, {
+                            equipmentId: currentIdString,
+                            name: form.name.value,
+                            category: form.category.value,
+                            subCategory: form.subCategory.value,
+                            condition: 'Working',
+                            isDisposed: false,
+                            quantity: 1, 
+                            locationId: null,
+                            createdAt: new Date().toISOString()
+                        });
+                        await logActivity('Item Added', `Added 1 item: ${currentIdString} - ${form.name.value}`);
+                        app.closeModal();
+                        showToast("Item Added");
+                    } catch (err) { console.error(err); showToast("Error saving item.", 'error'); }
+                    return;
+                }
+
+                // Logic for numbered IDs (single or bulk)
+                const prefix = match[1]; 
+                let nextNum = parseInt(match[2], 10); 
+                const padding = match[2].length; 
+
+                const itemsToCreate = [];
+                let createdCount = 0;
+                let attempts = 0;
+                const maxAttempts = quantity + 500; // Safety limit
+
+                // Smart Loop: Find valid IDs skipping existing and retired
+                while (createdCount < quantity && attempts < maxAttempts) {
+                    const candidateId = `${prefix}${String(nextNum).padStart(padding, '0')}`;
+                    
+                    const existsInInventory = state.inventory.some(i => i.equipmentId === candidateId);
+                    const isRetired = (state.masterData.retiredIds || []).includes(candidateId);
+
+                    if (!existsInInventory && !isRetired) {
+                        itemsToCreate.push({
+                            equipmentId: candidateId,
+                            name: form.name.value,
+                            category: form.category.value,
+                            subCategory: form.subCategory.value,
+                            condition: 'Working',
+                            isDisposed: false,
+                            quantity: 1, 
+                            locationId: null,
+                            createdAt: new Date().toISOString()
+                        });
+                        createdCount++;
+                    }
+                    nextNum++;
+                    attempts++;
+                }
+
+                if (createdCount === 0) {
+                    alert("Could not generate any valid IDs. Please check if IDs are exhausted.");
+                    return;
+                }
+
+                if (createdCount < quantity) {
+                    if(!confirm(`Could only generate ${createdCount} valid IDs out of ${quantity} requested. Continue?`)) return;
+                }
+
+                try {
+                    const batch = writeBatch(db);
+                    itemsToCreate.forEach(item => {
+                        const ref = doc(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'));
+                        batch.set(ref, item);
+                    });
+                    await batch.commit();
+                    
+                    // Improved Log message
+                    const rangeMsg = createdCount > 1 
+                        ? `from ${itemsToCreate[0].equipmentId} to ${itemsToCreate[itemsToCreate.length-1].equipmentId}`
+                        : itemsToCreate[0].equipmentId;
+                        
+                    await logActivity('Item Added', `Added ${createdCount} items (${form.name.value}) ${rangeMsg}`);
+                    app.closeModal();
+                    showToast(`${createdCount} Items Added`);
+                } catch (err) { console.error(err); showToast("Error saving items.", 'error'); }
+            },
+
+            // --- CORE LOGIC ---
+
+            toggleCondition: async (itemId, currentCondition) => {
+                const item = state.inventory.find(i => i.id === itemId); // Find item
+                const name = item ? item.name : 'Unknown Item';
+                const code = item ? item.equipmentId : 'Unknown ID';
+                const newCondition = currentCondition === 'Defective' ? 'Working' : 'Defective';
+                try {
+                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', itemId);
+                    await updateDoc(ref, { condition: newCondition });
+                    await logActivity('Condition Changed', `${code} ${name} set to ${newCondition}`); // Readable log
+                    app.refreshModal();
+                } catch(err) { console.error(err); showToast("Failed to update condition.", 'error'); }
+            },
+
+            toggleDisposal: (itemId, itemName, itemCode, isDisposed) => {
+                // Determine action (Dispose or Restore)
+                const newStatus = !isDisposed; 
+                const action = newStatus ? 'Move to Pullout (Disposal)' : 'Restore to Active Inventory';
+                
+                app.openConfirmModal(`${action}?`, async () => {
+                    try {
+                        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', itemId);
+                        const update = { isDisposed: newStatus };
+                        // If moving TO disposal (newStatus is true), clear location
+                        // If restoring (newStatus is false), location stays null (Storage) until moved
+                        if (newStatus) update.locationId = null; 
+                        
+                        await updateDoc(ref, update);
+                        await logActivity(
+                            newStatus ? 'Item Disposed' : 'Item Restored', 
+                            `${itemCode} ${itemName} ${newStatus ? 'moved to pullout' : 'restored to active'}`
+                        );
+                        showToast(newStatus ? "Item Moved to Pullout" : "Item Restored");
+                    } catch(err) { console.error(err); showToast("Failed to update status.", 'error'); }
+                });
+            },
+
+            // UPDATED DELETE LOGIC
+            deleteItem: (itemId, itemName, itemCode, isPermanent) => {
+                const msg = isPermanent 
+                    ? "⚠️ PERMANENTLY DELETE this item? This ID will be retired forever." 
+                    : "Remove item? This ID will be available for reuse.";
+                
+                app.openConfirmModal(msg, async () => {
+                    try {
+                        if (isPermanent) {
+                            // Add to retired IDs list
+                            if (!state.masterData.retiredIds) state.masterData.retiredIds = [];
+                            state.masterData.retiredIds.push(itemCode);
+                            await saveMasterData();
+                        }
+
+                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', itemId));
+                        await logActivity('Item Deleted', `${itemCode} ${itemName} deleted (${isPermanent ? 'Permanent' : 'Reusable'})`);
+                        showToast("Item Deleted");
+                        if (!isPermanent) {
+                            renderStorageList();
+                        }
+                    } catch(err) { console.error(err); showToast("Failed to delete item.", 'error'); }
+                });
+            },
+
+            deleteCategory: (categoryName) => { // Legacy deletion from storage view
+                 app.openConfirmModal("Please manage Categories in the Settings tab.", () => app.setActiveTab('settings'));
+            },
+
+            deleteSubCategory: (subName, catName) => { // Legacy
+                 app.openConfirmModal("Please manage Sub-Categories in the Settings tab.", () => app.setActiveTab('settings'));
+            },
+
+            // --- Settings Logic ---
+
+            submitManageCategory: async (e, action, oldName) => {
+                e.preventDefault();
+                const newName = e.target.name.value.trim();
+                if(!newName) return;
+
+                const cats = state.masterData.categories;
+                if (action === 'add') {
+                    if (cats.some(c => c.name === newName)) { showToast("Category exists", 'error'); return; }
+                    cats.push({ name: newName, subs: [] });
+                } else if (action === 'rename') {
+                    const cat = cats.find(c => c.name === oldName);
+                    if (cat) cat.name = newName;
+                    // Batch update items
+                    const batch = writeBatch(db);
+                    state.inventory.filter(i => i.category === oldName).forEach(i => {
+                        batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { category: newName });
+                    });
+                    await batch.commit();
+                }
+                
+                await saveMasterData();
+                app.closeModal();
+                renderMainContent();
+            },
+
+            deleteMasterCategory: (name) => {
+                app.openConfirmModal(`Delete Category "${name}"?`, async () => {
+                    const idx = state.masterData.categories.findIndex(c => c.name === name);
+                    if (idx > -1) {
+                        state.masterData.categories.splice(idx, 1);
+                        await saveMasterData();
+                        showToast("Category Deleted");
+                        renderMainContent();
+                    }
+                });
+            },
+
+            submitManageSubCategory: async (e, action, parentCat, oldName) => {
+                e.preventDefault();
+                const newName = e.target.name.value.trim();
+                if(!newName) return;
+
+                const cat = state.masterData.categories.find(c => c.name === parentCat);
+                if (!cat) return;
+
+                if (action === 'add') {
+                    if (!cat.subs) cat.subs = [];
+                    if (cat.subs.includes(newName)) { showToast("Sub-category exists", 'error'); return; }
+                    cat.subs.push(newName);
+                } else if (action === 'rename') {
+                    const idx = cat.subs.indexOf(oldName);
+                    if (idx > -1) cat.subs[idx] = newName;
+                    // Batch update items
+                    const batch = writeBatch(db);
+                    state.inventory.filter(i => i.category === parentCat && i.subCategory === oldName).forEach(i => {
+                        batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { subCategory: newName });
+                    });
+                    await batch.commit();
+                }
+
+                await saveMasterData();
+                app.closeModal();
+                renderMainContent();
+            },
+
+            deleteMasterSubCategory: (parentCat, subName) => {
+                app.openConfirmModal(`Delete Sub-Category "${subName}"?`, async () => {
+                    const cat = state.masterData.categories.find(c => c.name === parentCat);
+                    if (cat && cat.subs) {
+                        const idx = cat.subs.indexOf(subName);
+                        if (idx > -1) {
+                            cat.subs.splice(idx, 1);
+                            await saveMasterData();
+                            showToast("Sub-Category Deleted");
+                            renderMainContent();
+                        }
+                    }
+                });
+            },
+
+            submitMoveSubCategory: async (e, subName, currentParent) => {
+                e.preventDefault();
+                const newParent = e.target.newParent.value;
+                if (!newParent || newParent === currentParent) return;
+
+                // 1. Update Master Data
+                const oldCat = state.masterData.categories.find(c => c.name === currentParent);
+                const newCat = state.masterData.categories.find(c => c.name === newParent);
+                
+                if (oldCat && newCat) {
+                    // Remove from old
+                    const idx = oldCat.subs.indexOf(subName);
+                    if (idx > -1) oldCat.subs.splice(idx, 1);
+                    // Add to new
+                    if (!newCat.subs) newCat.subs = [];
+                    if (!newCat.subs.includes(subName)) newCat.subs.push(subName);
+                    
+                    await saveMasterData();
+
+                    // 2. Batch Update Inventory
+                    const batch = writeBatch(db);
+                    const itemsToMove = state.inventory.filter(i => i.category === currentParent && i.subCategory === subName);
+                    
+                    if (itemsToMove.length > 0) {
+                        itemsToMove.forEach(i => {
+                             const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id);
+                             batch.update(ref, { category: newParent });
+                        });
+                        await batch.commit();
+                        await logActivity('Category Moved', `Sub-category "${subName}" moved from ${currentParent} to ${newParent}. Updated ${itemsToMove.length} items.`);
+                        showToast(`Moved ${itemsToMove.length} items to ${newParent}`);
+                    } else {
+                        showToast("Category Structure Updated");
+                    }
+                    
+                    app.closeModal();
+                    renderMainContent();
+                }
+            },
+
+            deleteLocation: (locationId) => {
+                const loc = state.locations.find(l => l.id === locationId);
+                if(!loc) return;
+                
+                app.openConfirmModal(`Delete "${loc.name}"? Items inside will move to Storage.`, async () => {
+                    try {
+                        const batch = writeBatch(db);
+                        const items = state.inventory.filter(i => i.locationId === locationId);
+                        items.forEach(i => {
+                            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id);
+                            batch.update(ref, { locationId: null });
+                        });
+
+                        if (loc.type === 'floor') {
+                            const childRooms = state.locations.filter(l => l.parentId === locationId);
+                            childRooms.forEach(room => {
+                                const roomItems = state.inventory.filter(i => i.locationId === room.id);
+                                roomItems.forEach(i => {
+                                    const iRef = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id);
+                                    batch.update(iRef, { locationId: null });
+                                });
+                                batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'locations', room.id));
+                            });
+                        }
+                        batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'locations', locationId));
+
+                        await batch.commit();
+                        await logActivity('Location Deleted', `Location: ${loc.name} deleted`);
+                        app.closeModal();
+                        showToast("Location Deleted");
+                        if (state.activeTab === 'settings') renderMainContent();
+                    } catch(err) { console.error(err); showToast(`Failed to delete location.`, 'error'); }
+                });
+            },
+
+            submitEditLocation: async (e, locationId) => {
+                e.preventDefault();
+                const form = e.target;
+                const updateData = { name: form.name.value };
+                if (form.customId) updateData.customId = form.customId.value;
+                try {
+                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'locations', locationId);
+                    await updateDoc(ref, updateData);
+                    await logActivity('Location Edited', `Updated location: ${form.name.value}`);
+                    app.closeModal();
+                    showToast("Location Updated");
+                    if(state.activeTab === 'settings') renderMainContent();
+                } catch (err) { console.error(err); showToast("Failed to update location", 'error'); }
+            },
+
+            // --- FIXED: ADD THIS MISSING FUNCTION ---
+            submitAddLocation: async (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const data = {
+                    name: form.name.value,
+                    type: form.type.value,
+                    parentId: form.parentId.value || null,
+                    createdAt: new Date().toISOString()
+                };
+                if (data.type === 'room' || data.type === 'box') {
+                    data.customId = form.customId ? form.customId.value : null;
+                }
+                if (data.type === 'room') {
+                    data.status = form.status ? form.status.value : 'vacant';
+                }
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'locations'), data);
+                    await logActivity('Location Added', `Added ${data.type}: ${data.name}`);
+                    app.closeModal();
+                    showToast(`${data.type} Created`);
+                    if(state.activeTab === 'settings') renderMainContent();
+                } catch (err) { console.error(err); showToast("Error creating location", 'error'); }
+            },
+
+            submitMoveItem: async (itemId, locationId, itemName, itemCode) => {
+                try {
+                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', itemId);
+                    const locationName = getLocationNamePlain(locationId);
+
+                    if (locationId === 'PULLOUT') {
+                        await updateDoc(ref, { locationId: null, isDisposed: true });
+                        await logActivity('Item Disposed', `${itemCode} ${itemName} moved to Pullout`);
+                        showToast("Item moved to Pullout");
+                    } else {
+                        await updateDoc(ref, { locationId: locationId || null, isDisposed: false });
+                        await logActivity('Item Moved', `${itemCode} ${itemName} moved to ${locationName}`);
+                        showToast("Item Moved");
+                    }
+                    app.closeModal();
+                } catch (err) { console.error(err); showToast("Error moving item", 'error'); }
+            },
+
+            submitAddItems: async (e, locationId) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const selectedIds = formData.getAll('selectedItems');
+                if (selectedIds.length === 0) return;
+                
+                const locationName = getLocationNamePlain(locationId);
+
+                try {
+                    const batch = writeBatch(db);
+                    selectedIds.forEach(id => {
+                        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id);
+                        batch.update(ref, { locationId: locationId, isDisposed: false });
+                    });
+                    await batch.commit();
+                    await logActivity('Bulk Items Added', `Added ${selectedIds.length} items to ${locationName}`);
+                    app.closeModal();
+                    showToast("Items Added");
+                } catch (err) { console.error(err); showToast("Failed to add items.", 'error'); }
+            },
+
+            submitSwap: async (sourceId, targetId, swapType) => {
+                if (!targetId || sourceId === targetId) return;
+                try {
+                    const batch = writeBatch(db);
+                    
+                    const sourceItems = state.inventory.filter(i => i.locationId === sourceId);
+                    const targetItems = state.inventory.filter(i => i.locationId === targetId);
+
+                    sourceItems.forEach(item => {
+                        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id);
+                        batch.update(ref, { locationId: targetId });
+                    });
+                    targetItems.forEach(item => {
+                        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id);
+                        batch.update(ref, { locationId: sourceId });
+                    });
+
+                    const sourceName = getLocationNamePlain(sourceId);
+                    const targetName = getLocationNamePlain(targetId);
+
+                    if (swapType === 'room') {
+                        const sourceLoc = state.locations.find(l => l.id === sourceId);
+                        const targetLoc = state.locations.find(l => l.id === targetId);
+                        
+                        if (sourceLoc && targetLoc) {
+                            const sourceRef = doc(db, 'artifacts', appId, 'public', 'data', 'locations', sourceId);
+                            const targetRef = doc(db, 'artifacts', appId, 'public', 'data', 'locations', targetId);
+                            batch.update(sourceRef, { name: targetLoc.name, status: targetLoc.status || 'vacant' });
+                            batch.update(targetRef, { name: sourceLoc.name, status: sourceLoc.status || 'vacant' });
+                        }
+                    }
+                    await batch.commit();
+                    await logActivity('Swap Executed', `Swapped ${swapType} between ${sourceName} and ${targetName}`);
+                    app.closeModal();
+                    showToast("Swap Complete");
+                } catch (err) { console.error(err); showToast("Failed to swap.", 'error'); }
+            },
+
+            updateRoomStatus: async (locationId, newStatus) => {
+                try {
+                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'locations', locationId);
+                    await updateDoc(ref, { status: newStatus });
+                    const locName = getLocationNamePlain(locationId);
+                    await logActivity('Status Changed', `${locName} status set to ${newStatus}`);
+                } catch (err) { console.error(err); showToast("Error updating status", 'error'); }
+            },
+
+            refreshModal: () => {
+                if (state.currentModal && state.currentModal.type === 'locationDetail') {
+                    renderModal(state.currentModal.type, state.currentModal.data);
+                }
+            },
+
+            generateNextId: (prefix) => {
+                if (!prefix) return 'ITEM-001';
+                const regex = new RegExp(`^${prefix}(\\d+)$`);
+                const existingIds = state.inventory
+                    .filter(i => i.equipmentId && i.equipmentId.match(regex))
+                    .map(i => parseInt(i.equipmentId.match(regex)[1]));
+                
+                let nextNum = 1;
+                if (existingIds.length > 0) {
+                    nextNum = Math.max(...existingIds) + 1;
+                }
+                return `${prefix}${String(nextNum).padStart(4, '0')}`;
+            }
+        };
+
+        // --- Render Helpers ---
+
+        function updateNavUI() {
+            ['dashboard', 'storage', 'floors', 'boxes', 'activity', 'settings'].forEach(tab => {
+                const btn = document.getElementById(`nav-${tab}`);
+                if (btn) {
+                    if (tab === state.activeTab) {
+                        btn.classList.remove('nav-item-inactive', 'text-gray-500');
+                        btn.classList.add('nav-item-active');
+                    } else {
+                        btn.classList.add('nav-item-inactive');
+                        btn.classList.remove('nav-item-active');
+                        // Restore special class for settings if needed
+                        if(tab === 'settings') btn.classList.add('text-gray-500'); 
+                    }
+                }
+            });
+        }
+
+        function renderStorageList() {
+            const list = document.getElementById('inventory-list');
+            if(list) {
+                list.innerHTML = generateInventoryItems();
+                lucide.createIcons();
+            }
+        }
+
+        function renderMainContent() {
+            const main = document.getElementById('main-content');
+            const title = document.getElementById('header-title');
+            
+            if (state.loading) return;
+
+            if (state.activeTab === 'dashboard') {
+                title.innerText = "Dashboard";
+                main.innerHTML = generateDashboardView();
+            } else if (state.activeTab === 'storage') {
+                title.innerText = "Storage Overview";
+                main.innerHTML = generateStorageView();
+            } else if (state.activeTab === 'floors') {
+                title.innerText = "Floor Management";
+                main.innerHTML = generateFloorsView(); // Now Defined
+            } else if (state.activeTab === 'boxes') {
+                title.innerText = "Box Index";
+                main.innerHTML = generateBoxesView(); // Now Defined
+            } else if (state.activeTab === 'activity') {
+                title.innerText = "Activity Logs";
+                main.innerHTML = generateActivityLogView(); // Now Defined
+            } else if (state.activeTab === 'settings') {
+                title.innerText = "Settings";
+                main.innerHTML = generateSettingsView();
+            }
+            lucide.createIcons();
+        }
+
+        // Initialization
+        async function init() {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
+            }
+            onAuthStateChanged(auth, (u) => {
+                state.user = u;
+                if (u) startListeners();
+                else {
+                    state.loading = false;
+                    renderMainContent();
+                }
+            });
+            updateNavUI();
+        }
+
+        function startListeners() {
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'), (snap) => {
+                state.inventory = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                checkLoading();
+                app.refreshModal();
+            });
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'locations'), (snap) => {
+                state.locations = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                checkLoading();
+                app.refreshModal();
+            });
+            // FIXED: Path matches saveMasterData
+            onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'global_settings', 'masterData'), (docSnap) => {
+                 if (docSnap.exists()) {
+                     state.masterData = docSnap.data();
+                 } else {
+                     // Init master data from inventory if empty
+                     if (state.inventory.length > 0 && (!state.masterData.categories || state.masterData.categories.length === 0)) {
+                         const temp = {};
+                         state.inventory.forEach(i => {
+                             if (!temp[i.category]) temp[i.category] = new Set();
+                             if (i.subCategory) temp[i.category].add(i.subCategory);
+                         });
+                         state.masterData.categories = Object.keys(temp).map(k => ({ name: k, subs: Array.from(temp[k]) }));
+                         saveMasterData();
+                     }
+                 }
+                 renderMainContent();
+            });
+            const logsQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'logs'), orderBy('timestamp', 'desc'), limit(50));
+            onSnapshot(logsQuery, (snap) => {
+                state.logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                if(state.activeTab === 'activity') renderMainContent();
+            });
+        }
+
+        let dataLoadedCount = 0;
+        function checkLoading() {
+            dataLoadedCount++;
+            if (dataLoadedCount >= 1) { 
+                state.loading = false;
+                renderMainContent();
+            }
+        }
+
+        // Initial launch
+        init();
+    </script>
+</body>
+</html>
