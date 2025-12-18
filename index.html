@@ -125,7 +125,7 @@
         </nav>
         
         <!-- Settings Footer (Desktop) -->
-        <div class="p-4 border-t border-gray-100">
+        <div id="sidebar-settings-container" class="p-4 border-t border-gray-100">
              <button onclick="app.setActiveTab('settings')" id="nav-settings" class="w-full nav-btn group flex items-center justify-start px-3 py-3 rounded-lg transition-all hover:bg-gray-50 text-gray-500 hover:text-gray-900">
                 <i data-lucide="settings" class="w-6 h-6 flex-none"></i>
                 <span class="ml-3 font-medium text-sm">Settings</span>
@@ -158,7 +158,7 @@
                     <button id="user-menu-btn" onclick="event.stopPropagation(); app.toggleUserMenu()" class="flex items-center gap-2 focus:outline-none hover:bg-gray-50 p-1.5 rounded-lg transition">
                         <div class="text-right hidden md:block">
                             <p id="header-user-name" class="text-xs font-bold text-gray-700 leading-none">User</p>
-                            <p class="text-[10px] text-gray-400 leading-none mt-1">Manage Account</p>
+                            <p id="header-user-role" class="text-[10px] text-gray-400 leading-none mt-1">Loading...</p>
                         </div>
                         <div class="bg-blue-100 text-blue-600 p-2 rounded-full border border-blue-200 shadow-sm">
                             <i data-lucide="user" class="w-5 h-5"></i>
@@ -171,6 +171,7 @@
                         <div class="p-4 border-b border-gray-100 md:hidden bg-gray-50 rounded-t-xl">
                             <p class="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Signed in as</p>
                             <p id="header-user-name-mobile" class="text-sm font-bold text-gray-800 truncate">User</p>
+                            <p id="header-user-role-mobile" class="text-xs text-gray-500 truncate">Role</p>
                         </div>
                         
                         <div class="p-2 space-y-1">
@@ -253,7 +254,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, sendPasswordResetEmail, updateEmail, updatePassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, writeBatch, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc as getDocFire, writeBatch, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- ICON GENERATION ---
         const appIconSvg = `
@@ -265,58 +266,38 @@
             <line x1="200" y1="250" x2="312" y2="250" stroke="white" stroke-width="32" stroke-linecap="round"/>
         </svg>`;
         const appIconUrl = 'data:image/svg+xml;base64,' + btoa(appIconSvg);
-        
-        // Set Favicon
         document.getElementById('favicon-link').href = appIconUrl;
 
-        // Generate PWA Manifest dynamically
-        const manifest = {
-            "name": "Inventory Manager",
-            "short_name": "Inventory",
-            "start_url": ".",
-            "display": "standalone",
-            "background_color": "#ffffff",
-            "theme_color": "#2563eb",
-            "icons": [
-                { "src": appIconUrl, "sizes": "512x512", "type": "image/svg+xml" },
-                { "src": appIconUrl, "sizes": "192x192", "type": "image/svg+xml" }
-            ]
-        };
-        const stringManifest = JSON.stringify(manifest);
-        const blob = new Blob([stringManifest], {type: 'application/json'});
-        const manifestURL = URL.createObjectURL(blob);
-        document.querySelector('#manifest-placeholder').setAttribute('href', manifestURL);
-
         // --- FIREBASE CONFIGURATION ---
-        const customConfig = {
-            apiKey: "AIzaSyAOB5sXGQPdchw3jhWojfy749cOTeAcfyw",
-            authDomain: "inventory-app-84fbf.firebaseapp.com",
-            projectId: "inventory-app-84fbf",
-            storageBucket: "inventory-app-84fbf.firebasestorage.app",
-            messagingSenderId: "120713547404",
-            appId: "1:120713547404:web:d092abf67d26a33351b5a9",
-            measurementId: "G-3KLSG5BE43"
-        };
+        // ⚠️ IMPORTANT: REPLACE THIS WITH YOUR OWN FIREBASE PROJECT CONFIGURATION
+        // 1. Go to console.firebase.google.com
+        // 2. Create a project
+        // 3. Add a Web App
+        // 4. Copy the config below
+        // 5. Enable Authentication > Sign-in method > Email/Password
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyAOB5sXGQPdchw3jhWojfy749cOTeAcfyw",
+  authDomain: "inventory-app-84fbf.firebaseapp.com",
+  projectId: "inventory-app-84fbf",
+  storageBucket: "inventory-app-84fbf.firebasestorage.app",
+  messagingSenderId: "120713547404",
+  appId: "1:120713547404:web:d092abf67d26a33351b5a9",
+  measurementId: "G-3KLSG5BE43"
+};
 
-        let firebaseConfig;
-        if (customConfig && customConfig.apiKey) {
-            console.log("Using Custom Firebase Config");
-            firebaseConfig = customConfig;
-        } else if (typeof __firebase_config !== 'undefined') {
-            firebaseConfig = JSON.parse(__firebase_config);
-        } else {
-            console.error("No Firebase configuration found.");
-        }
+        let firebaseConfig = customConfig;
+        if (typeof __firebase_config !== 'undefined') firebaseConfig = JSON.parse(__firebase_config);
 
         const appInstance = initializeApp(firebaseConfig);
         const auth = getAuth(appInstance);
         const db = getFirestore(appInstance);
-        
         const appId = customConfig.appId ? 'inventory-app-84fbf' : (typeof __app_id !== 'undefined' ? __app_id : 'default-app-id');
 
         const state = {
             user: null,
-            authMode: 'login', // 'login' or 'register'
+            userRole: null,
+            authMode: 'login',
             loginAttempts: 0,
             inventory: [],
             locations: [],
@@ -328,389 +309,29 @@
             currentModal: null, 
             pendingAction: null,
             loading: true,
+            loadingAuth: false,
             searchTerm: ''
         };
 
-        // --- 1. UTILITIES ---
-        window.esc = (str) => {
-            if (typeof str !== 'string') return str;
-            return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        };
+        window.esc = (str) => typeof str !== 'string' ? str : str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
-        // Helper for Philippines Timezone
         function formatDatePH(isoString) {
             if (!isoString) return '';
-            try {
-                return new Date(isoString).toLocaleString('en-US', { 
-                    timeZone: 'Asia/Manila',
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric', 
-                    hour: 'numeric', 
-                    minute: '2-digit',
-                    hour12: true
-                });
-            } catch (e) {
-                return new Date(isoString).toLocaleString();
-            }
+            try { return new Date(isoString).toLocaleString('en-US', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }); } 
+            catch (e) { return new Date(isoString).toLocaleString(); }
         }
 
-        function getFloorPrefix(name) {
-            const match = name.match(/(\d+)/);
-            if (match) return match[0]; 
-            const words = name.split(' ');
-            if (words.length > 1) return words.map(w => w[0]).join('').toUpperCase().substring(0, 2);
-            return name.substring(0, 2).toUpperCase();
-        }
-
-        function getLocationName(locationId) {
-            if (!locationId) return '<span class="text-gray-400 italic">Unassigned</span>';
-            const loc = state.locations.find(l => l.id === locationId);
-            return loc ? `<span class="text-blue-600 font-medium">${loc.name}</span>` : '<span class="text-red-400">Unknown Loc</span>';
-        }
-        
-        function getLocationNamePlain(locationId) {
-            if (!locationId) return 'Storage';
-            if (locationId === 'PULLOUT') return 'Pullout / Disposal';
-            const loc = state.locations.find(l => l.id === locationId);
-            return loc ? loc.name : 'Unknown Location';
-        }
-
-        function generateLocationCard(location, iconName, iconColorClass, bgClass, borderColorClass) {
-            const count = state.inventory.filter(i => i.locationId === location.id).length;
-            let statusBadge = '';
-            if (location.type === 'room' && location.status) {
-                const s = location.status;
-                let color = 'bg-gray-100 text-gray-600';
-                if (s === 'vacant') color = 'bg-green-100 text-green-700 border-green-200';
-                else if (s === 'occupied') color = 'bg-red-100 text-red-700 border-red-200';
-                else if (s === 'maintenance') color = 'bg-yellow-100 text-yellow-700 border-yellow-200';
-                statusBadge = `<div class="w-2.5 h-2.5 rounded-full ${color.replace('text-', 'bg-').split(' ')[0].replace('100', '500')} absolute top-3 right-3"></div>`;
-            }
-            return `<div onclick="app.openLocationDetail('${location.id}')" class="relative border ${borderColorClass || 'border-gray-200'} rounded-xl p-4 hover:shadow-md hover:border-blue-400 cursor-pointer transition flex flex-col items-center justify-center text-center group bg-white h-32">
-                ${statusBadge}
-                <div class="mb-1 text-xs font-bold text-gray-400 uppercase tracking-widest font-mono">${location.customId || 'NO-ID'}</div>
-                <h4 class="font-bold text-gray-900 text-base leading-tight mb-2 px-2 line-clamp-2">${location.name}</h4>
-                <div class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full font-medium">${count} Items</div>
-                <button onclick="event.stopPropagation(); app.openEditLocationModal('${location.id}')" class="absolute bottom-2 right-2 p-1.5 text-gray-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition opacity-0 group-hover:opacity-100"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
-            </div>`;
-        }
-
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            const bgClass = type === 'error' ? 'bg-red-50 text-red-800 border-red-200' : 'bg-green-50 text-green-800 border-green-200';
-            toast.className = `toast-enter p-3 rounded-lg shadow-lg border text-sm font-medium flex items-center gap-2 ${bgClass}`;
-            toast.innerHTML = type === 'error' ? `<i data-lucide="alert-circle" class="w-4 h-4"></i> ${message}` : `<i data-lucide="check-circle" class="w-4 h-4"></i> ${message}`;
-            container.appendChild(toast);
-            lucide.createIcons();
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(100%)';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        async function logActivity(action, details) {
-            try {
-                let userName = 'Anonymous';
-                if (state.user) {
-                    userName = state.user.displayName || state.user.email || 'User';
-                }
-                
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'logs'), {
-                    action,
-                    details,
-                    timestamp: new Date().toISOString(),
-                    user: userName
-                });
-            } catch (e) { console.error("Log error", e); }
-        }
-
-        async function saveMasterData() {
-            try {
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'global_settings', 'masterData'), state.masterData);
-            } catch(e) { console.error("Save master error", e); }
-        }
-
-        // --- CORE MODAL RENDERER ---
-        function renderModal(type, data = {}) {
-            state.currentModal = { type, data };
-            const container = document.getElementById('modal-container');
-            const content = document.getElementById('modal-content');
-            let html = '';
-            
-            if (type === 'addItem') {
-                const cats = state.masterData.categories || [];
-                const preCat = data.category;
-                const preSub = data.subCategory;
-
-                const catOptions = cats.length > 0 
-                    ? cats.map(c => `<option value="${c.name}" ${c.name === preCat ? 'selected' : ''}>${c.name}</option>`).join('') 
-                    : '<option value="" disabled>No categories. Go to Settings to add.</option>';
-                
-                let subOptions = '<option value="" disabled selected>Select Category First</option>';
-                let idValue = '';
-
-                if (preCat) {
-                    const catObj = cats.find(c => c.name === preCat);
-                    if (catObj && catObj.subs) {
-                        subOptions = '<option value="" disabled>Select...</option>' + 
-                            catObj.subs.map(s => `<option value="${s}" ${s === preSub ? 'selected' : ''}>${s}</option>`).join('');
-                    }
-                }
-
-                if (preSub) {
-                     let prefix = preSub.split(' ').map(word => word[0]).join('').toUpperCase();
-                     if (prefix.length < 2) prefix = preSub.substring(0, 2).toUpperCase();
-                     idValue = app.generateNextId(prefix);
-                }
-                
-                html = `<div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100">
-                    <div class="flex justify-between items-center mb-6"><h2 class="text-xl font-bold flex items-center gap-2"><i data-lucide="plus-circle" class="w-6 h-6 text-blue-600"></i> Add New Item</h2><button onclick="app.closeModal()" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-5 h-5"></i></button></div>
-                    <form onsubmit="app.submitAddItem(event)" class="space-y-4">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="col-span-2">
-                                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Item Name</label>
-                                <input name="name" required placeholder="e.g., Godox SL60W" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" />
-                            </div>
-                            <div>
-                                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Category</label>
-                                <select id="input-category" name="category" required onchange="app.updateSubCategoryOptions(this.value)" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition cursor-pointer">
-                                    <option value="" disabled selected>Select...</option>
-                                    ${catOptions}
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Sub-Category</label>
-                                <select id="input-subcategory" name="subCategory" required onchange="app.generateIdFromSubCategory(this.value)" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition cursor-pointer">
-                                    ${subOptions}
-                                </select>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Quantity</label><input name="quantity" type="number" min="1" value="1" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" /></div>
-                            <div>
-                                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Equipment ID</label>
-                                <div class="relative">
-                                    <input id="input-equipment-id" name="equipmentId" required value="${idValue}" placeholder="e.g., SL-0001" oninput="app.checkIdAvailability(this)" class="w-full p-3 bg-gray-100 border border-gray-200 rounded-lg font-mono uppercase focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" />
-                                    <div id="id-feedback" class="absolute right-3 top-3.5 hidden"><i data-lucide="alert-circle" class="w-5 h-5 text-red-500"></i></div>
-                                </div>
-                                <p id="id-error-msg" class="text-[10px] text-red-500 mt-1 font-bold hidden"></p>
-                            </div>
-                        </div>
-                        <div class="flex gap-3 pt-6 border-t border-gray-100 mt-2">
-                            <button type="button" onclick="app.closeModal()" class="flex-1 py-3 text-gray-600 font-medium hover:bg-gray-50 rounded-lg transition">Cancel</button>
-                            <button type="submit" id="btn-save-item" class="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition transform active:scale-95">Save Item</button>
-                        </div>
-                    </form>
-                </div>`;
-            } else if (type === 'manageCategory') {
-                const isRename = data.action === 'rename';
-                html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><h3 class="font-bold text-xl mb-6 text-gray-800">${isRename ? 'Rename Category' : 'New Category'}</h3><form onsubmit="app.submitManageCategory(event, '${data.action}', '${data.name || ''}')"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Category Name</label><input name="name" required value="${data.name || ''}" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition mb-6" autofocus /><div class="flex justify-end gap-3"><button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button><button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-lg hover:bg-blue-700 transition transform active:scale-95">Save</button></div></form></div>`;
-            } else if (type === 'manageSubCategory') {
-                const isRename = data.action === 'rename';
-                html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><h3 class="font-bold text-xl mb-6 text-gray-800">${isRename ? 'Rename Sub-Category' : `New Sub-Category for ${data.parentCat}`}</h3><form onsubmit="app.submitManageSubCategory(event, '${data.action}', '${data.parentCat}', '${data.name || ''}')"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Sub-Category Name</label><input name="name" required value="${data.name || ''}" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition mb-6" autofocus /><div class="flex justify-end gap-3"><button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button><button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-lg hover:bg-blue-700 transition transform active:scale-95">Save</button></div></form></div>`;
-            } else if (type === 'moveSubCategory') {
-                const categories = state.masterData.categories.filter(c => c.name !== data.currentParent);
-                const options = categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
-                html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><h3 class="font-bold text-xl mb-2 text-gray-800">Move Sub-Category</h3><p class="text-sm text-gray-500 mb-6">Moving <strong>${data.subName}</strong> to another category.</p><form onsubmit="app.submitMoveSubCategory(event, '${data.subName}', '${data.currentParent}')"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">New Parent Category</label><select name="newParent" required class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition mb-6"><option value="" disabled selected>Select Category...</option>${options}</select><div class="flex justify-end gap-3"><button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button><button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-lg hover:bg-blue-700 transition transform active:scale-95">Move & Update Items</button></div></form></div>`;
-            } else if (type === 'addStock') {
-                 const sampleItem = state.inventory.find(i => i.name === data.name && i.category === data.category && i.subCategory === data.subCategory);
-                 let nextIdHint = '';
-                 if(sampleItem) {
-                     const match = sampleItem.equipmentId.match(/^(.*?)-?(\d+)$/);
-                     if(match) {
-                         const prefix = match[1] + (sampleItem.equipmentId.includes('-') ? '-' : '');
-                         nextIdHint = app.generateNextId(prefix);
-                     }
-                 }
-                 html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><h3 class="font-bold text-xl mb-2 text-gray-800">Add Stock</h3><p class="text-sm text-gray-500 mb-6">Adding more: <strong>${data.name}</strong></p><form onsubmit="app.submitAddItem(event)" class="space-y-4"><input type="hidden" name="name" value="${data.name}"><input type="hidden" name="category" value="${data.category}"><input type="hidden" name="subCategory" value="${data.subCategory}"><div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Quantity to Add</label><input name="quantity" type="number" min="1" value="1" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" autofocus /></div><div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Start Equipment ID</label><div class="relative"><input name="equipmentId" required value="${nextIdHint}" oninput="app.checkIdAvailability(this)" class="w-full p-3 bg-gray-100 border border-gray-200 rounded-lg font-mono uppercase focus:ring-2 focus:ring-blue-500 outline-none transition" /><div id="id-feedback" class="absolute right-3 top-3.5 hidden"><i data-lucide="alert-circle" class="w-5 h-5 text-red-500"></i></div></div><p id="id-error-msg" class="text-[10px] text-red-500 mt-1 font-bold hidden"></p><p class="text-[10px] text-gray-400 mt-1">Adjust if necessary. Will increment automatically.</p></div><div class="flex justify-end gap-3 pt-2"><button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button><button type="submit" id="btn-save-item" class="px-5 py-2.5 bg-green-600 text-white rounded-lg font-medium shadow-lg hover:bg-green-700 transition transform active:scale-95">Add Stock</button></div></form></div>`;
-            } else if (type === 'addLocation') {
-                const isRoom = data.type === 'room'; const isBox = data.type === 'box'; let title = 'New Location'; let nextId = ''; if (data.type === 'floor') title = 'New Floor'; else if (isBox) { title = 'New Box'; const existingBoxes = state.locations.filter(l => l.type === 'box'); nextId = `Box ${existingBoxes.length + 1}`; } else if (isRoom) { title = 'New Room'; const parentFloor = state.locations.find(l => l.id === data.parentId); const existingRooms = state.locations.filter(l => l.type === 'room' && l.parentId === data.parentId); let prefix = "RM"; if (parentFloor) { prefix = getFloorPrefix(parentFloor.name); } const nextNum = String(existingRooms.length + 1).padStart(3, '0'); nextId = `${prefix}-${nextNum}`; }
-                html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><h3 class="font-bold text-xl mb-6 text-gray-800">${title}</h3><form onsubmit="app.submitAddLocation(event)"><input type="hidden" name="type" value="${data.type}"><input type="hidden" name="parentId" value="${data.parentId || ''}">${isRoom || isBox ? `<div class="mb-4"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">${isRoom ? 'Room' : 'Box'} ID (Auto)</label><input name="customId" value="${nextId}" class="w-full p-3 bg-gray-100 border border-gray-200 rounded-lg text-gray-600 font-mono text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition" /></div>` : ''}<div class="mb-4"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Name / Label</label><input name="name" required placeholder="Name..." class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" autofocus /></div>${isRoom ? `<div class="mb-6"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Initial Status</label><select name="status" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"><option value="vacant">Vacant (Green)</option><option value="occupied">Occupied (Red)</option><option value="maintenance">Maintenance (Yellow)</option></select></div>` : ''}<div class="flex justify-end gap-3 ${!isRoom ? 'mt-6' : ''}"><button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button><button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-lg hover:bg-blue-700 transition transform active:scale-95">Create</button></div></form></div>`;
-            } else if (type === 'editLocation') {
-                const loc = state.locations.find(l => l.id === data.locationId); if (!loc) return;
-                html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><h3 class="font-bold text-xl mb-6 text-gray-800">Edit ${loc.type}</h3><form onsubmit="app.submitEditLocation(event, '${loc.id}')">${loc.type !== 'floor' ? `<div class="mb-4"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">ID</label><input name="customId" value="${loc.customId || ''}" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg font-mono text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition" /></div>` : ''}<div class="mb-6"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Name</label><input name="name" required value="${loc.name}" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" autofocus /></div><div class="flex justify-between gap-3 pt-2"><button type="button" id="btn-delete-loc" onclick="app.deleteLocation('${loc.id}')" class="px-4 py-2.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition">Delete</button><div class="flex gap-3"><button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button><button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-lg hover:bg-blue-700 transition transform active:scale-95">Update</button></div></div></form></div>`;
-            } else if (type === 'moveItem') {
-                const item = state.inventory.find(i => i.id === data.itemId); if (!item) return;
-                const floors = state.locations.filter(l => l.type === 'floor'); const boxes = state.locations.filter(l => l.type === 'box');
-                let options = `<option value="">Storage (Default)</option>`;
-                floors.forEach(f => { const rooms = state.locations.filter(l => l.type === 'room' && l.parentId === f.id); if(rooms.length > 0) { options += `<optgroup label="${f.name}">`; rooms.forEach(r => options += `<option value="${r.id}" ${item.locationId === r.id ? 'selected' : ''}>${r.name}</option>`); options += `</optgroup>`; } });
-                if(boxes.length > 0) { options += `<optgroup label="Boxes">`; boxes.forEach(b => options += `<option value="${b.id}" ${item.locationId === b.id ? 'selected' : ''}>${b.name}</option>`); options += `</optgroup>`; }
-                options += `<option value="PULLOUT" class="text-red-600 font-bold">Pullout / Disposal</option>`;
-                html = `<div class="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl p-6 shadow-2xl pointer-events-auto animate-slide-up sm:animate-in mb-0 sm:mb-auto absolute bottom-0 sm:relative border-t sm:border border-gray-100"><div class="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-4 sm:hidden"></div><h3 class="text-xl font-bold mb-1 text-gray-900">Move Item</h3><p class="text-sm text-gray-500 mb-6">Where do you want to move <strong class="text-blue-600">${item.name}</strong> (${item.equipmentId})?</p><div class="space-y-5"><div><label class="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">Select Location</label><div class="relative"><i data-lucide="map-pin" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5 z-10"></i><select id="move-select" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer">${options}</select><i data-lucide="chevron-down" class="absolute right-3 top-3.5 text-gray-400 w-4 h-4 pointer-events-none"></i></div></div><div class="flex gap-3 pt-2"><button type="button" onclick="app.closeModal()" class="flex-1 py-3 text-gray-600 font-medium text-sm hover:bg-gray-100 rounded-xl transition">Cancel</button><button id="btn-move-confirm" onclick="app.submitMoveItem('${item.id}', document.getElementById('move-select').value, '${window.esc(item.name)}', '${window.esc(item.equipmentId)}')" class="flex-1 py-3 bg-blue-600 text-white font-medium text-sm rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition flex justify-center items-center transform active:scale-95">Confirm</button></div></div></div>`;
-            } else if (type === 'swapContents') {
-                const sourceLoc = state.locations.find(l => l.id === data.locationId); if (!sourceLoc) return;
-                const floors = state.locations.filter(l => l.type === 'floor'); const boxes = state.locations.filter(l => l.type === 'box');
-                let options = ``; floors.forEach(f => { const rooms = state.locations.filter(l => l.type === 'room' && l.parentId === f.id); if(rooms.length > 0) { options += `<optgroup label="${f.name}">`; rooms.forEach(r => options += `<option value="${r.id}">${r.name}</option>`); options += `</optgroup>`; } });
-                if(boxes.length > 0) { options += `<optgroup label="Boxes">`; boxes.forEach(b => { if (b.id !== sourceLoc.id) options += `<option value="${b.id}">${b.name}</option>`; }); options += `</optgroup>`; }
-                html = `<div class="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl p-6 shadow-2xl pointer-events-auto animate-slide-up sm:animate-in mb-0 sm:mb-auto absolute bottom-0 sm:relative border-t sm:border border-gray-100"><div class="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-4 sm:hidden"></div><div class="flex items-center gap-3 mb-2"><div class="bg-indigo-100 p-2 rounded-lg text-indigo-600"><i data-lucide="arrow-right-left" class="w-6 h-6"></i></div><h3 class="text-xl font-bold text-gray-900">Swap Action</h3></div><p class="text-sm text-gray-500 mb-6">Choose action for <strong class="text-gray-900">${sourceLoc.name}</strong>.</p><div class="space-y-4"><div><label class="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">Target Location</label><div class="relative"><i data-lucide="map-pin" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5 z-10"></i><select id="swap-select" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer"><option value="" disabled selected>Select a location...</option>${options}</select><i data-lucide="chevron-down" class="absolute right-3 top-3.5 text-gray-400 w-4 h-4 pointer-events-none"></i></div></div><div><label class="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">Action Type</label><div class="grid grid-cols-2 gap-2"><label class="cursor-pointer"><input type="radio" name="swapType" value="contents" checked class="peer sr-only"><div class="border rounded-xl p-3 text-center text-sm font-medium text-gray-500 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700 transition">Swap Contents<span class="block text-[10px] font-normal mt-0.5">Move items only</span></div></label><label class="cursor-pointer"><input type="radio" name="swapType" value="room" class="peer sr-only"><div class="border rounded-xl p-3 text-center text-sm font-medium text-gray-500 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700 transition">Swap Room Info<span class="block text-[10px] font-normal mt-0.5">Name/Status + Items</span></div></label></div></div><div class="flex gap-3 pt-2"><button type="button" onclick="app.closeModal()" class="flex-1 py-3 text-gray-600 font-medium text-sm hover:bg-gray-100 rounded-xl transition">Cancel</button><button id="btn-swap-confirm" onclick="app.submitSwap('${sourceLoc.id}', document.getElementById('swap-select').value, document.querySelector('input[name=swapType]:checked').value)" class="flex-1 py-3 bg-indigo-600 text-white font-medium text-sm rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition flex justify-center items-center transform active:scale-95">Execute Swap</button></div></div></div>`;
-            } else if (type === 'addItems') {
-                const loc = state.locations.find(l => l.id === data.locationId);
-                const unassignedItems = state.inventory.filter(i => !i.locationId && !i.isDisposed);
-                const grouped = {};
-                unassignedItems.forEach(i => { if (!grouped[i.name]) grouped[i.name] = []; grouped[i.name].push(i); });
-                const list = Object.keys(grouped).length === 0 ? `<div class="text-center py-8 text-gray-400">No active items available in storage.</div>` : Object.keys(grouped).sort().map(name => {
-                    const items = grouped[name].sort((a,b) => a.equipmentId.localeCompare(b.equipmentId, undefined, {numeric: true}));
-                    const category = items[0].category;
-                    return `<div class="add-item-group mb-4 border border-gray-200 rounded-lg overflow-hidden" data-search="${name} ${category}"><div class="bg-gray-50 p-3 flex justify-between items-center border-b border-gray-200"><div><h4 class="font-bold text-sm text-gray-800">${name}</h4><p class="text-xs text-gray-500">${category} • ${items.length} Available</p></div><label class="flex items-center gap-2 text-xs font-bold text-blue-600 cursor-pointer select-none"><input type="checkbox" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" onchange="app.toggleSelectAll(this)"> Select All</label></div><div class="max-h-40 overflow-y-auto p-2 bg-white space-y-1 custom-scrollbar">${items.map(i => { const statusColor = i.condition === 'Defective' ? 'bg-red-500' : 'bg-green-500'; return `<label class="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer transition"><input type="checkbox" name="selectedItems" value="${i.id}" class="item-checkbox w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"><div class="w-2 h-2 rounded-full ${statusColor}"></div><span class="text-xs font-mono font-bold text-gray-600 bg-gray-100 px-1.5 rounded">${i.equipmentId}</span></label>`}).join('')}</div></div>`;
-                }).join('');
-                html = `<div class="bg-white rounded-2xl w-full max-w-lg h-[80vh] flex flex-col shadow-2xl pointer-events-auto animate-in border border-gray-100"><div class="p-5 border-b border-gray-100 flex justify-between items-center bg-white rounded-t-2xl"><div><h3 class="font-bold text-xl text-gray-800">Add Items</h3><p class="text-xs text-gray-500">To <strong>${loc ? loc.name : 'Location'}</strong></p></div><button onclick="app.closeModal()" class="bg-gray-50 p-2 rounded-full shadow-sm text-gray-400 hover:text-gray-600 transition"><i data-lucide="x" class="w-5 h-5"></i></button></div><div class="p-4 border-b border-gray-100 bg-gray-50/50"><div class="relative"><i data-lucide="search" class="absolute left-3 top-3 text-gray-400 w-4 h-4"></i><input placeholder="Search available items..." class="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" oninput="app.filterAddItems(event)"/></div></div><form onsubmit="app.submitAddItems(event, '${loc ? loc.id : ''}')" class="flex-1 overflow-hidden flex flex-col"><div class="flex-1 overflow-y-auto p-4 scroller">${list}</div><div class="p-4 border-t border-gray-100 bg-white rounded-b-2xl"><button type="submit" class="w-full py-3 bg-blue-600 text-white font-medium text-sm rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition flex justify-center items-center transform active:scale-[0.99]">Add Selected Items</button></div></form></div>`;
-            } else if (type === 'locationDetail') {
-                const loc = state.locations.find(l => l.id === data.locationId);
-                const items = state.inventory.filter(i => i.locationId === data.locationId);
-                let statusControls = '';
-                if (loc && loc.type === 'room') {
-                    const statuses = ['vacant', 'occupied', 'maintenance'];
-                    const colors = { vacant: 'bg-green-100 text-green-700 border-green-200', occupied: 'bg-red-100 text-red-700 border-red-200', maintenance: 'bg-yellow-100 text-yellow-700 border-yellow-200' };
-                    statusControls = `<div class="px-5 py-3 border-b border-gray-100 bg-gray-50"><label class="text-xs font-bold text-gray-500 uppercase mb-2 block">Room Status</label><div class="flex gap-2">${statuses.map(s => `<button onclick="app.updateRoomStatus('${loc.id}', '${s}')" class="flex-1 py-1.5 text-xs font-bold uppercase rounded-md border transition ${loc.status === s ? colors[s] + ' shadow-sm' : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-100'}">${s}</button>`).join('')}</div></div>`;
-                }
-                const list = items.length === 0 ? `<div class="text-center py-12 text-gray-400 flex flex-col items-center"><div class="bg-gray-50 p-4 rounded-full mb-3"><i data-lucide="box" class="w-8 h-8 opacity-40"></i></div><p class="font-medium">This location is empty.</p></div>` : items.map(i => {
-                    let quantityBadge = i.quantity && i.quantity > 1 ? `<span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-blue-200 mr-2">x${i.quantity}</span>` : '';
-                    const statusColor = i.condition === 'Defective' ? 'bg-red-500' : 'bg-green-500';
-                    return `<div class="flex justify-between items-center p-4 bg-white hover:bg-gray-50 transition rounded-xl border border-gray-100 shadow-sm group"><div class="flex items-center gap-3"><button onclick="app.toggleCondition('${i.id}', '${i.condition || 'Working'}')" class="w-3 h-3 rounded-full ${statusColor} hover:scale-125 transition shadow-sm" title="${i.condition || 'Working'} (Click to toggle)"></button><div class="bg-blue-50 text-blue-600 font-mono text-xs font-bold px-2 py-1 rounded">${i.equipmentId}</div><div><p class="text-sm font-bold text-gray-800 flex items-center">${quantityBadge} ${i.name}</p><p class="text-xs text-gray-500">${i.category}</p></div></div><div class="flex gap-2"><button onclick="app.openMoveItemModal('${i.id}')" class="text-gray-400 hover:text-blue-600 p-1.5 rounded hover:bg-blue-50 transition" title="Move"><i data-lucide="arrow-right-left" class="w-4 h-4"></i></button></div></div>`
-                }).join('');
-                html = `<div class="bg-white rounded-2xl w-[95%] max-w-md max-h-[85vh] flex flex-col shadow-2xl pointer-events-auto animate-in border border-gray-100"><div class="p-5 border-b border-gray-100 flex justify-between items-center bg-white rounded-t-2xl"><div><h3 class="font-bold text-xl text-gray-800 flex items-center gap-2">${loc ? loc.name : 'Unknown'} ${loc && loc.customId ? `<span class="text-sm font-normal text-gray-400 border border-gray-200 px-2 rounded-md">${loc.customId}</span>` : ''}</h3><p class="text-xs text-gray-500">${items.length} items inside</p></div><div class="flex gap-2"><button onclick="app.openSwapModal('${loc.id}')" class="bg-indigo-50 p-2 rounded-full shadow-sm text-indigo-600 hover:bg-indigo-100 hover:scale-105 transition" title="Swap"><i data-lucide="arrow-right-left" class="w-5 h-5"></i></button><button onclick="app.openEditLocationModal('${loc.id}')" class="bg-gray-50 p-2 rounded-full shadow-sm text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition"><i data-lucide="pencil" class="w-5 h-5"></i></button><button onclick="app.closeModal()" class="bg-gray-50 p-2 rounded-full shadow-sm text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"><i data-lucide="x" class="w-5 h-5"></i></button></div></div><div class="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between"><span class="text-xs font-bold text-gray-500 uppercase">Quick Actions</span><button onclick="app.openAddItemsModal('${loc.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm flex items-center gap-1 transition transform active:scale-95"><i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Items</button></div>${statusControls}<div class="p-4 overflow-y-auto flex-1 space-y-2 scroller bg-gray-50/30">${list}</div></div>`;
-            } else if (type === 'editItemName') {
-                const item = state.inventory.find(i => i.id === data.itemId); if (!item) return;
-                html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100">
-                    <h3 class="font-bold text-xl mb-4 text-gray-800">Rename Item</h3>
-                    <p class="text-sm text-gray-500 mb-6">Renaming <strong>${item.name}</strong> will update all identical items.</p>
-                    <form onsubmit="app.submitEditItemName(event, '${item.name}', '${item.category}', '${item.subCategory}')">
-                        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">New Item Name</label>
-                        <input name="newName" required value="${item.name}" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition mb-6" autofocus />
-                        <div class="flex justify-end gap-3">
-                            <button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button>
-                            <button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-lg hover:bg-blue-700 transition transform active:scale-95">Rename All</button>
-                        </div>
-                    </form>
-                </div>`;
-            } else if (type === 'editProfile') {
-                 // ... same code for editProfile ...
-                 const user = state.user;
-                html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100">
-                    <h3 class="font-bold text-xl mb-6 text-gray-800">Edit Profile</h3>
-                    <form onsubmit="app.submitEditProfile(event)">
-                        <div class="mb-4">
-                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Nickname</label>
-                            <input name="nickname" value="${user.displayName || ''}" required class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" />
-                        </div>
-                        <div class="mb-4">
-                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Email</label>
-                            <input type="email" name="email" value="${user.email}" required class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" />
-                            <p class="text-[10px] text-gray-400 mt-1">Changing email may require re-login.</p>
-                        </div>
-                        <div class="mb-6">
-                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">New Password</label>
-                            <input type="password" name="password" placeholder="Leave blank to keep current" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" />
-                        </div>
-                        <div class="flex justify-end gap-3">
-                            <button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button>
-                            <button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-lg hover:bg-blue-700 transition transform active:scale-95">Save Changes</button>
-                        </div>
-                    </form>
-                </div>`;
-            }
-
-            content.innerHTML = html;
-            container.classList.remove('hidden');
-            lucide.createIcons();
-        }
-
-        // --- 2. GENERATORS ---
-
+        // --- VIEW GENERATORS (Moved here to ensure availability) ---
         function generateAuthView() {
             const isLogin = state.authMode === 'login';
             const isForgot = state.authMode === 'forgot';
-            
+            const isLoading = state.loadingAuth;
+
             if (isForgot) {
-                return `
-                <div class="bg-white w-full max-w-md p-8 rounded-2xl shadow-xl border border-gray-100 animate-in mx-4">
-                    <div class="text-center mb-8">
-                        <div class="inline-block p-3 bg-red-100 rounded-xl shadow-lg shadow-red-50 mb-4">
-                            <i data-lucide="key-round" class="w-8 h-8 text-red-600"></i>
-                        </div>
-                        <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Reset Password</h1>
-                        <p class="text-sm text-gray-500 mt-2">Enter your email to receive reset instructions</p>
-                    </div>
-                    <form onsubmit="app.handleForgotPassword(event)" class="space-y-5">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 tracking-wider">Email Address</label>
-                            <div class="relative">
-                                <i data-lucide="mail" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5"></i>
-                                <input type="email" name="email" required placeholder="name@company.com" class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition">
-                            </div>
-                        </div>
-                        <button type="submit" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition transform active:scale-[0.99]">
-                            Send Reset Link
-                        </button>
-                    </form>
-                    <div class="mt-6 text-center">
-                        <button onclick="app.setAuthMode('login')" class="text-sm text-gray-500 hover:text-blue-600 font-medium transition">
-                            Back to Sign In
-                        </button>
-                    </div>
-                </div>`;
+                return `<div class="bg-white w-full max-w-md p-8 rounded-2xl shadow-xl border border-gray-100 animate-in mx-4"><div class="text-center mb-8"><div class="inline-block p-3 bg-red-100 rounded-xl shadow-lg shadow-red-50 mb-4"><i data-lucide="key-round" class="w-8 h-8 text-red-600"></i></div><h1 class="text-2xl font-bold text-gray-900 tracking-tight">Reset Password</h1><p class="text-sm text-gray-500 mt-2">Enter your email to receive reset instructions</p></div><form onsubmit="app.handleForgotPassword(event)" class="space-y-5"><div><label class="block text-xs font-bold text-gray-500 uppercase mb-1 tracking-wider">Email Address</label><div class="relative"><i data-lucide="mail" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5"></i><input type="email" name="email" required placeholder="name@company.com" class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition"></div></div><button type="submit" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition transform active:scale-[0.99] flex justify-center items-center gap-2" ${isLoading ? 'disabled' : ''}>${isLoading ? 'Sending...' : 'Send Reset Link'}</button></form><div class="mt-6 text-center"><button onclick="app.setAuthMode('login')" class="text-sm text-gray-500 hover:text-blue-600 font-medium transition">Back to Sign In</button></div></div>`;
             }
 
-            return `
-            <div class="bg-white w-full max-w-md p-8 rounded-2xl shadow-xl border border-gray-100 animate-in mx-4">
-                <div class="text-center mb-8">
-                    <div class="inline-block p-3 bg-blue-600 rounded-xl shadow-lg shadow-blue-200 mb-4">
-                        <i data-lucide="package" class="w-8 h-8 text-white"></i>
-                    </div>
-                    <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Inventory Manager</h1>
-                    <p class="text-sm text-gray-500 mt-2">Please sign in to access the system</p>
-                </div>
-
-                <form onsubmit="${isLogin ? 'app.handleLogin(event)' : 'app.handleRegister(event)'}" class="space-y-5">
-                    ${!isLogin ? `
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 tracking-wider">Nickname</label>
-                        <div class="relative">
-                            <i data-lucide="user" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5"></i>
-                            <input type="text" name="nickname" required placeholder="John Doe" class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition">
-                        </div>
-                    </div>` : ''}
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 tracking-wider">Email Address</label>
-                        <div class="relative">
-                            <i data-lucide="mail" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5"></i>
-                            <input type="email" name="email" required placeholder="name@company.com" class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 tracking-wider">Password</label>
-                        <div class="relative">
-                            <i data-lucide="lock" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5"></i>
-                            <input type="password" name="password" required placeholder="••••••••" class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition">
-                        </div>
-                    </div>
-                    
-                    ${isLogin && state.loginAttempts >= 3 ? `
-                        <div class="p-3 bg-red-50 border border-red-100 rounded-lg flex items-center justify-between animate-in">
-                            <span class="text-xs text-red-600 font-medium">Trouble logging in?</span>
-                            <button type="button" onclick="app.setAuthMode('forgot')" class="text-xs font-bold text-red-700 hover:underline">Reset Password</button>
-                        </div>
-                    ` : ''}
-
-                    <button type="submit" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition transform active:scale-[0.99] flex justify-center items-center gap-2">
-                        ${isLogin ? 'Sign In' : 'Create Account'} <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                    </button>
-                </form>
-
-                <div class="mt-6 text-center space-y-2">
-                    <button onclick="app.toggleAuthMode()" class="block w-full text-sm text-gray-500 hover:text-blue-600 font-medium transition">
-                        ${isLogin ? "Don't have an account? Create one" : "Already have an account? Sign In"}
-                    </button>
-                    ${isLogin && state.loginAttempts < 3 ? `
-                        <button onclick="app.setAuthMode('forgot')" class="block w-full text-xs text-gray-400 hover:text-gray-600 transition">
-                            Forgot Password?
-                        </button>
-                    ` : ''}
-                </div>
-            </div>`;
+            return `<div class="bg-white w-full max-w-md p-8 rounded-2xl shadow-xl border border-gray-100 animate-in mx-4"><div class="text-center mb-8"><div class="inline-block p-3 bg-blue-600 rounded-xl shadow-lg shadow-blue-200 mb-4"><i data-lucide="package" class="w-8 h-8 text-white"></i></div><h1 class="text-2xl font-bold text-gray-900 tracking-tight">Inventory Manager</h1><p class="text-sm text-gray-500 mt-2">Please sign in to access the system</p></div><form onsubmit="${isLogin ? 'app.handleLogin(event)' : 'app.handleRegister(event)'}" class="space-y-5">${!isLogin ? `<div><label class="block text-xs font-bold text-gray-500 uppercase mb-1 tracking-wider">Nickname</label><div class="relative"><i data-lucide="user" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5"></i><input type="text" name="nickname" required placeholder="John Doe" class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition"></div></div><div><label class="block text-xs font-bold text-gray-500 uppercase mb-1 tracking-wider">Role</label><div class="relative"><i data-lucide="shield" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5"></i><select name="role" required class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition appearance-none"><option value="" disabled selected>Select Role...</option><option value="Live Operator">Live Operator</option><option value="Technical Support Supervisor">Technical Support Supervisor</option><option value="Live Operator Lead">Live Operator Lead</option><option value="Live Operator Trainer">Live Operator Trainer</option></select><i data-lucide="chevron-down" class="absolute right-3 top-3.5 text-gray-400 w-4 h-4 pointer-events-none"></i></div></div>` : ''}<div><label class="block text-xs font-bold text-gray-500 uppercase mb-1 tracking-wider">Email Address</label><div class="relative"><i data-lucide="mail" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5"></i><input type="email" name="email" required placeholder="name@company.com" class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition"></div></div><div><label class="block text-xs font-bold text-gray-500 uppercase mb-1 tracking-wider">Password</label><div class="relative"><i data-lucide="lock" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5"></i><input type="password" name="password" required minlength="6" placeholder="••••••••" class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition"></div></div>${isLogin && state.loginAttempts >= 3 ? `<div class="p-3 bg-red-50 border border-red-100 rounded-lg flex items-center justify-between animate-in"><span class="text-xs text-red-600 font-medium">Trouble logging in?</span><button type="button" onclick="app.setAuthMode('forgot')" class="text-xs font-bold text-red-700 hover:underline">Reset Password</button></div>` : ''}<button type="submit" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition transform active:scale-[0.99] flex justify-center items-center gap-2" ${isLoading ? 'disabled' : ''}>${isLoading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')} <i data-lucide="arrow-right" class="w-4 h-4"></i></button></form><div class="mt-6 text-center space-y-2"><button onclick="app.toggleAuthMode()" class="block w-full text-sm text-gray-500 hover:text-blue-600 font-medium transition">${isLogin ? "Don't have an account? Create one" : "Already have an account? Sign In"}</button>${isLogin && state.loginAttempts < 3 ? `<button onclick="app.setAuthMode('forgot')" class="block w-full text-xs text-gray-400 hover:text-gray-600 transition">Forgot Password?</button>` : ''}</div></div>`;
         }
 
         function generateDashboardView() {
@@ -734,31 +355,19 @@
             <div class="space-y-6 fade-in max-w-7xl mx-auto">
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                     <div class="bg-white p-4 md:p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-full">
-                        <div>
-                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Active</p>
-                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1">${totalItems}</h3>
-                        </div>
+                        <div><p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Active</p><h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1">${totalItems}</h3></div>
                         <div class="self-end p-2 bg-blue-50 text-blue-600 rounded-lg mt-2"><i data-lucide="package" class="w-5 h-5"></i></div>
                     </div>
                     <div class="bg-white p-4 md:p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-full">
-                        <div>
-                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Assigned</p>
-                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1">${assignedItems}</h3>
-                        </div>
+                        <div><p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Assigned</p><h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1">${assignedItems}</h3></div>
                         <div class="self-end p-2 bg-indigo-50 text-indigo-600 rounded-lg mt-2"><i data-lucide="map-pin" class="w-5 h-5"></i></div>
                     </div>
                     <div class="bg-white p-4 md:p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-full">
-                        <div>
-                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">In Storage</p>
-                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1">${unassignedItems}</h3>
-                        </div>
+                        <div><p class="text-xs font-bold text-gray-500 uppercase tracking-wider">In Storage</p><h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1">${unassignedItems}</h3></div>
                         <div class="self-end p-2 bg-orange-50 text-orange-600 rounded-lg mt-2"><i data-lucide="box" class="w-5 h-5"></i></div>
                     </div>
                     <div class="bg-white p-4 md:p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-full">
-                        <div>
-                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Disposed</p>
-                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1">${disposedItems}</h3>
-                        </div>
+                        <div><p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Disposed</p><h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1">${disposedItems}</h3></div>
                         <div class="self-end p-2 bg-red-50 text-red-600 rounded-lg mt-2"><i data-lucide="trash-2" class="w-5 h-5"></i></div>
                     </div>
                 </div>
@@ -788,16 +397,7 @@
                                     .slice(0, 5).map(cat => {
                                     const count = subCategories[cat];
                                     const pct = Math.round((count / totalItems) * 100);
-                                    return `
-                                    <div>
-                                        <div class="flex justify-between text-xs mb-1">
-                                            <span class="font-medium text-gray-600">${cat}</span>
-                                            <span class="text-gray-400">${count} items</span>
-                                        </div>
-                                        <div class="w-full bg-gray-100 rounded-full h-2">
-                                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${pct}%"></div>
-                                        </div>
-                                    </div>`;
+                                    return `<div><div class="flex justify-between text-xs mb-1"><span class="font-medium text-gray-600">${cat}</span><span class="text-gray-400">${count} items</span></div><div class="w-full bg-gray-100 rounded-full h-2"><div class="bg-blue-600 h-2 rounded-full" style="width: ${pct}%"></div></div></div>`;
                                 }).join('') : '<p class="text-sm text-gray-400 italic">No items yet.</p>'}
                             </div>
                         </div>
@@ -827,32 +427,7 @@
         function generateStorageView() {
             const activeClass = "border-blue-600 text-blue-600 bg-blue-50";
             const inactiveClass = "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50";
-            return `
-                <div class="space-y-6 fade-in max-w-7xl mx-auto">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <h2 class="text-2xl font-bold text-gray-800">Inventory Catalog</h2>
-                            <p class="text-sm text-gray-500">Master list of all items</p>
-                        </div>
-                        <button onclick="app.openAddItemModal()" class="bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow hover:bg-blue-700 transition">
-                            <i data-lucide="plus" class="w-4 h-4"></i> <span class="hidden sm:inline">Add Item</span>
-                        </button>
-                    </div>
-                    <div class="flex border-b border-gray-200">
-                        <button onclick="app.setStorageMode('active')" class="flex-1 pb-3 text-sm font-medium border-b-2 transition ${state.storageViewMode === 'active' ? activeClass : inactiveClass}">
-                            Active
-                        </button>
-                        <button onclick="app.setStorageMode('disposal')" class="flex-1 pb-3 text-sm font-medium border-b-2 transition ${state.storageViewMode === 'disposal' ? 'border-red-500 text-red-600 bg-red-50' : inactiveClass}">
-                            Disposal
-                        </button>
-                    </div>
-                    <div class="relative">
-                        <i data-lucide="search" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5"></i>
-                        <input id="search-input" type="text" placeholder="Search items..." class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm shadow-sm" oninput="app.handleSearch(event)" />
-                    </div>
-                    <div id="inventory-list" class="space-y-6">${generateInventoryItems()}</div>
-                </div>
-            `;
+            return `<div class="space-y-6 fade-in max-w-7xl mx-auto"><div class="flex justify-between items-center"><div><h2 class="text-2xl font-bold text-gray-800">Inventory Catalog</h2><p class="text-sm text-gray-500">Master list of all items</p></div><button onclick="app.openAddItemModal()" class="bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow hover:bg-blue-700 transition"><i data-lucide="plus" class="w-4 h-4"></i> <span class="hidden sm:inline">Add Item</span></button></div><div class="flex border-b border-gray-200"><button onclick="app.setStorageMode('active')" class="flex-1 pb-3 text-sm font-medium border-b-2 transition ${state.storageViewMode === 'active' ? activeClass : inactiveClass}">Active</button><button onclick="app.setStorageMode('disposal')" class="flex-1 pb-3 text-sm font-medium border-b-2 transition ${state.storageViewMode === 'disposal' ? 'border-red-500 text-red-600 bg-red-50' : inactiveClass}">Disposal</button></div><div class="relative"><i data-lucide="search" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5"></i><input id="search-input" type="text" placeholder="Search items..." class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm shadow-sm" oninput="app.handleSearch(event)" /></div><div id="inventory-list" class="space-y-6">${generateInventoryItems()}</div></div>`;
         }
 
         function generateFloorsView() { const floors = state.locations.filter(l => l.type === 'floor').sort((a, b) => a.name.localeCompare(b.name)); const header = `<div class="flex justify-between items-center"><div><h2 class="text-2xl font-bold text-gray-800">Floors</h2><p class="text-sm text-gray-500">Building layout</p></div><button onclick="app.openAddLocationModal('floor')" class="bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow hover:bg-indigo-700 transition"><i data-lucide="plus" class="w-4 h-4"></i> Add Floor</button></div>`; let content = ''; if (floors.length === 0) { content = `<div class="text-center py-20 bg-white rounded-xl border border-dashed border-gray-300 mt-6"><i data-lucide="layers" class="w-12 h-12 text-gray-300 mx-auto mb-3"></i><p class="text-gray-500 font-medium">No floors yet.</p></div>`; } else { content = floors.map(floor => { const rooms = state.locations.filter(l => l.type === 'room' && l.parentId === floor.id); rooms.sort((a, b) => (a.customId || a.name).localeCompare((b.customId || b.name), undefined, { numeric: true, sensitivity: 'base' })); const roomCards = rooms.length === 0 ? `<p class="text-sm text-gray-400 italic col-span-full py-4 text-center">No rooms here.</p>` : rooms.map(room => generateLocationCard(room, 'home', 'text-indigo-600', 'bg-white', 'border-indigo-100')).join(''); return `<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6 mt-6"><div class="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center"><h3 class="font-bold text-gray-800 flex items-center gap-2 text-lg"><i data-lucide="layers" class="w-5 h-5 text-indigo-500"></i> ${floor.name} <button onclick="app.openEditLocationModal('${floor.id}')" class="text-gray-400 hover:text-blue-600 p-1 rounded-full transition"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button></h3><button onclick="app.openAddLocationModal('room', '${floor.id}')" class="text-xs bg-white border border-gray-300 px-3 py-1.5 rounded-md text-gray-700 font-medium hover:bg-gray-50 transition shadow-sm">+ Add Room</button></div><div class="p-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">${roomCards}</div></div>`; }).join(''); } return `<div class="space-y-6 max-w-7xl mx-auto fade-in">${header}${content}</div>`; }
@@ -860,164 +435,9 @@
         function generateActivityLogView() { const logs = state.logs || []; if (logs.length === 0) { return `<div class="flex flex-col items-center justify-center py-20 text-gray-400"><i data-lucide="clipboard-list" class="w-16 h-16 mb-4 opacity-20"></i><p>No activity recorded yet.</p></div>`; } return `<div class="space-y-4 fade-in max-w-7xl mx-auto"><h2 class="text-2xl font-bold text-gray-800">Activity Log</h2><div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"><div class="divide-y divide-gray-100">${logs.map(log => { const date = formatDatePH(log.timestamp); let icon = 'info'; let colorClass = 'text-gray-500 bg-gray-100'; if (log.action.includes('Added')) { icon = 'plus-circle'; colorClass = 'text-green-600 bg-green-50'; } else if (log.action.includes('Deleted')) { icon = 'trash-2'; colorClass = 'text-red-600 bg-red-50'; } else if (log.action.includes('Moved')) { icon = 'arrow-right-left'; colorClass = 'text-blue-600 bg-blue-50'; } else if (log.action.includes('Renamed')) { icon = 'edit-2'; colorClass = 'text-orange-600 bg-orange-50'; } else if (log.action.includes('Swap')) { icon = 'refresh-cw'; colorClass = 'text-purple-600 bg-purple-50'; } const userLabel = log.user ? `<span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded ml-2 uppercase tracking-wide border border-blue-100">${window.esc(log.user.split('@')[0])}</span>` : ''; return `<div class="p-4 flex gap-4 hover:bg-gray-50 transition"><div class="mt-1"><div class="p-2 rounded-full ${colorClass}"><i data-lucide="${icon}" class="w-4 h-4"></i></div></div><div class="flex-1"><div class="flex justify-between items-start"><h4 class="font-bold text-sm text-gray-900 flex items-center">${log.action} ${userLabel}</h4><span class="text-xs text-gray-400 whitespace-nowrap ml-2">${date}</span></div><p class="text-sm text-gray-600 mt-1 whitespace-pre-line">${log.details}</p></div></div>`; }).join('')}</div></div></div>`; }
         function generateSettingsView() { return `<div class="max-w-5xl mx-auto space-y-6 fade-in pb-10"><div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200 pb-4 gap-4"><div><h2 class="text-2xl font-bold text-gray-800">System Settings</h2><p class="text-sm text-gray-500">Manage categories, locations, and reports</p></div><div class="flex space-x-1 bg-gray-100 p-1 rounded-lg"><button onclick="app.setSettingsTab('categories')" class="px-4 py-2 rounded-md text-sm font-medium transition ${state.settingsTab === 'categories' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">Categories</button><button onclick="app.setSettingsTab('locations')" class="px-4 py-2 rounded-md text-sm font-medium transition ${state.settingsTab === 'locations' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">Locations</button><button onclick="app.setSettingsTab('reports')" class="px-4 py-2 rounded-md text-sm font-medium transition ${state.settingsTab === 'reports' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">Reports</button></div></div>${state.settingsTab === 'categories' ? generateCategorySettings() : state.settingsTab === 'locations' ? generateLocationSettings() : generateReportSettings()}<div class="mt-8 border-t border-gray-200 pt-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"><div class="flex items-center gap-3"><div class="bg-gray-100 p-3 rounded-full"><i data-lucide="user" class="w-6 h-6 text-gray-600"></i></div><div><p class="font-bold text-gray-900">${state.user ? (state.user.displayName || 'User') : 'Guest'}</p><p class="text-xs text-gray-500">${state.user ? state.user.email : 'No email'}</p></div></div><div class="flex gap-3 w-full sm:w-auto"><button onclick="app.openEditProfileModal()" class="flex-1 sm:flex-none px-6 py-3 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition shadow-sm flex items-center justify-center gap-2"><i data-lucide="edit-3" class="w-4 h-4"></i> Edit Profile</button><button onclick="app.handleLogout()" class="flex-1 sm:flex-none px-6 py-3 bg-red-50 text-red-600 hover:bg-red-100 font-bold rounded-xl transition flex items-center justify-center gap-2"><i data-lucide="log-out" class="w-4 h-4"></i> Log Out</button></div></div></div>`; }
         function generateReportSettings() { return `<div class="grid grid-cols-1 md:grid-cols-2 gap-8"><div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm"><div class="flex items-center gap-3 mb-4"><div class="bg-red-100 p-2.5 rounded-lg text-red-600"><i data-lucide="file-text" class="w-6 h-6"></i></div><div><h3 class="text-lg font-bold text-gray-800">Generate PDF Report</h3><p class="text-sm text-gray-500">Select content to include</p></div></div><div class="space-y-4 mb-8"><label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition"><input type="checkbox" id="report-summary" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"><div><span class="font-bold text-gray-700 text-sm block">Executive Summary</span><span class="text-xs text-gray-400">Stats and charts</span></div></label><label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition"><input type="checkbox" id="report-inventory" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"><div><span class="font-bold text-gray-700 text-sm block">Full Inventory List</span><span class="text-xs text-gray-400">Active items</span></div></label><label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition"><input type="checkbox" id="report-locations" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"><div><span class="font-bold text-gray-700 text-sm block">Location Status</span><span class="text-xs text-gray-400">Room details</span></div></label><label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition"><input type="checkbox" id="report-logs" class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"><div><span class="font-bold text-gray-700 text-sm block">Activity Logs</span><span class="text-xs text-gray-400">Recent actions</span></div></label></div><button onclick="app.generatePDF()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg shadow-blue-200 transition flex items-center justify-center gap-2"><i data-lucide="download" class="w-5 h-5"></i> Download PDF Report</button></div><div class="bg-blue-50 border border-blue-100 rounded-xl p-6 flex flex-col justify-center items-center text-center"><img src="https://illustrations.popsy.co/amber/success.svg" class="w-48 h-48 mb-6 opacity-80" alt="Report"><h3 class="text-xl font-bold text-blue-900 mb-2">Professional Reporting</h3><p class="text-sm text-blue-700 max-w-xs">Generate clean, branded PDF reports for audits and reviews.</p></div></div>`; }
-        
         function generateCategorySettings() { const categories = state.masterData.categories || []; if (categories.length === 0) return `<div class="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300"><p class="text-gray-500 mb-4">No categories defined.</p><button onclick="app.openManageCategoryModal('add')" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">Create First Category</button></div>`; return `<div class="grid grid-cols-1 gap-6"><div class="flex justify-between items-center"><h3 class="text-lg font-bold text-gray-800">All Categories</h3><button onclick="app.openManageCategoryModal('add')" class="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow hover:bg-blue-700 transition"><i data-lucide="plus" class="w-4 h-4"></i> New Category</button></div><div class="space-y-4">${categories.map(cat => `<div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm"><div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center group"><div class="font-bold text-gray-800 flex items-center gap-2"><i data-lucide="folder" class="w-4 h-4 text-blue-500"></i> ${cat.name}</div><div class="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition"><button onclick="app.openManageCategoryModal('rename', '${window.esc(cat.name)}')" class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-white rounded-md transition" title="Rename"><i data-lucide="pencil" class="w-4 h-4"></i></button><button onclick="app.deleteMasterCategory('${window.esc(cat.name)}')" class="p-1.5 text-gray-500 hover:text-red-600 hover:bg-white rounded-md transition" title="Delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div></div><div class="p-4"><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">${cat.subs && cat.subs.length > 0 ? cat.subs.map(sub => `<div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100 group/sub hover:border-blue-200 transition"><span class="text-sm font-medium text-gray-700">${sub}</span><div class="flex gap-1 opacity-100 md:opacity-0 md:group-hover/sub:opacity-100 transition"><button onclick="app.openMoveSubCategoryModal('${window.esc(sub)}', '${window.esc(cat.name)}')" class="p-1 text-gray-400 hover:text-orange-600" title="Move"><i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i></button><button onclick="app.openManageSubCategoryModal('rename', '${window.esc(cat.name)}', '${window.esc(sub)}')" class="p-1 text-gray-400 hover:text-blue-600" title="Rename"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button><button onclick="app.deleteMasterSubCategory('${window.esc(cat.name)}', '${window.esc(sub)}')" class="p-1 text-gray-400 hover:text-red-600" title="Delete"><i data-lucide="x" class="w-3.5 h-3.5"></i></button></div></div>`).join('') : '<span class="text-sm text-gray-400 italic">No sub-categories</span>'}<button onclick="app.openManageSubCategoryModal('add', '${window.esc(cat.name)}')" class="flex items-center justify-center gap-2 p-3 border border-dashed border-gray-300 rounded-lg text-gray-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition text-sm font-medium"><i data-lucide="plus" class="w-4 h-4"></i> Add Sub-Category</button></div></div></div>`).join('')}</div></div>`; }
         function generateLocationSettings() { const floors = state.locations.filter(l => l.type === 'floor').sort((a,b) => a.name.localeCompare(b.name)); const boxes = state.locations.filter(l => l.type === 'box').sort((a,b) => a.name.localeCompare(b.name)); return `<div class="grid grid-cols-1 lg:grid-cols-2 gap-8"><div class="space-y-4"><div class="flex justify-between items-center"><h3 class="text-lg font-bold text-gray-800">Floors & Rooms</h3><button onclick="app.openAddLocationModal('floor')" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100 transition">+ Add Floor</button></div><div class="space-y-4">${floors.map(floor => { const rooms = state.locations.filter(l => l.parentId === floor.id).sort((a,b) => a.name.localeCompare(b.name)); return `<div class="bg-white border border-gray-200 rounded-lg overflow-hidden"><div class="bg-gray-50 px-3 py-2 border-b border-gray-200 flex justify-between items-center"><span class="font-bold text-gray-800 text-sm flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4 text-indigo-500"></i> ${floor.name}</span><div class="flex gap-1"><button onclick="app.openAddLocationModal('room', '${floor.id}')" class="text-xs bg-white border border-gray-300 px-2 py-0.5 rounded text-gray-600 hover:bg-gray-50">+ Room</button><button onclick="app.openEditLocationModal('${floor.id}')" class="text-gray-400 hover:text-blue-600 p-1"><i data-lucide="settings-2" class="w-3.5 h-3.5"></i></button></div></div><div class="p-2 space-y-1">${rooms.length > 0 ? rooms.map(room => `<div class="flex justify-between items-center p-2 rounded hover:bg-gray-50 group"><div class="flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full ${room.status === 'occupied' ? 'bg-red-500' : (room.status === 'maintenance' ? 'bg-yellow-500' : 'bg-green-500')}"></div><span class="text-sm text-gray-700">${room.name}</span><span class="text-[10px] text-gray-400 font-mono border px-1 rounded">${room.customId || 'N/A'}</span></div><button onclick="app.openEditLocationModal('${room.id}')" class="text-gray-300 hover:text-blue-600 p-1 opacity-0 group-hover:opacity-100 transition"><i data-lucide="pencil" class="w-3 h-3"></i></button></div>`).join('') : '<div class="p-2 text-xs text-gray-400 italic text-center">No rooms</div>'}</div></div>`; }).join('')}</div></div><div class="space-y-4"><div class="flex justify-between items-center"><h3 class="text-lg font-bold text-gray-800">Boxes & Containers</h3><button onclick="app.openAddLocationModal('box')" class="px-3 py-1.5 bg-orange-50 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-100 transition">+ Add Box</button></div><div class="bg-white border border-gray-200 rounded-xl p-4">${boxes.length > 0 ? `<div class="grid grid-cols-2 gap-3">${boxes.map(box => `<div class="flex justify-between items-center p-2 border border-gray-100 rounded-lg hover:border-orange-200 group"><div class="flex items-center gap-2"><i data-lucide="box" class="w-4 h-4 text-orange-500"></i><span class="text-sm font-medium text-gray-700 truncate">${box.name}</span></div><button onclick="app.openEditLocationModal('${box.id}')" class="text-gray-300 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button></div>`).join('')}</div>` : '<div class="text-center py-8 text-gray-400 italic">No boxes registered.</div>'}</div></div></div>`; }
-        function generateInventoryItems() {
-            const term = state.searchTerm.toLowerCase();
-            const isDisposalMode = state.storageViewMode === 'disposal';
-            
-            let filtered = state.inventory.filter(item => {
-                const matchesMode = isDisposalMode ? item.isDisposed : !item.isDisposed;
-                const matchesTerm = item.name.toLowerCase().includes(term) ||
-                    item.equipmentId.toLowerCase().includes(term) ||
-                    (item.category && item.category.toLowerCase().includes(term));
-                return matchesMode && matchesTerm;
-            });
-
-            if (filtered.length === 0 && (state.masterData.categories || []).length === 0) {
-                const emptyMsg = isDisposalMode ? "Pullout bin is empty." : "No active items found.";
-                return `<div class="flex flex-col items-center justify-center py-20 text-gray-400"><i data-lucide="${isDisposalMode ? 'trash-2' : 'package-open'}" class="w-16 h-16 mb-4 opacity-20"></i><p>${emptyMsg}</p></div>`;
-            }
-
-            // --- Structure Building Logic (Modified to include empty Master Data categories) ---
-            const grouped = {};
-
-            // 1. Initialize structure from Master Data (if Active mode)
-            if (!isDisposalMode) {
-                (state.masterData.categories || []).forEach(cat => {
-                    grouped[cat.name] = {};
-                    if(cat.subs) {
-                        cat.subs.forEach(sub => {
-                            grouped[cat.name][sub] = {};
-                        });
-                    }
-                });
-            }
-
-            // 2. Populate with actual inventory items
-            filtered.forEach(item => {
-                const cat = item.category || 'Uncategorized';
-                const sub = item.subCategory || 'General';
-                const name = item.name || 'Unnamed';
-                
-                if (!grouped[cat]) grouped[cat] = {};
-                if (!grouped[cat][sub]) grouped[cat][sub] = {};
-                if (!grouped[cat][sub][name]) grouped[cat][sub][name] = [];
-                grouped[cat][sub][name].push(item);
-            });
-
-            let html = '';
-            
-            Object.keys(grouped).sort().forEach(cat => {
-                const subKeys = Object.keys(grouped[cat]).sort();
-                html += `<div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm mb-4">`;
-                html += `<div class="bg-gray-50 px-4 py-3 border-b border-gray-200 font-bold text-gray-700 flex items-center gap-2"><div class="flex items-center gap-2 flex-1"><i data-lucide="folder" class="w-4 h-4 text-blue-500"></i> ${cat}</div>${!isDisposalMode ? `<div class="flex gap-1"><button onclick="app.openRenameModal('category', '${window.esc(cat)}')" class="text-gray-300 hover:text-blue-500 p-1 rounded transition" title="Rename"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button></div>` : ''}</div>`;
-                html += `<div class="p-4 space-y-4">`;
-                
-                if (subKeys.length === 0) {
-                     html += `<div class="text-xs text-gray-400 italic">No sub-categories defined.</div>`;
-                }
-
-                subKeys.forEach(sub => {
-                    const itemNames = Object.keys(grouped[cat][sub]).sort();
-                    
-                    html += `<div class="space-y-3">`;
-                    html += `<h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 group/sub"><span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span> ${sub}${!isDisposalMode ? `<button onclick="app.openAddItemModal({category: '${window.esc(cat)}', subCategory: '${window.esc(sub)}'})" class="text-gray-300 hover:text-blue-600 p-1 rounded transition opacity-0 group-hover/sub:opacity-100" title="Add New Item to ${sub}"><i data-lucide="plus-circle" class="w-3.5 h-3.5"></i></button><button onclick="app.openRenameModal('subCategory', '${window.esc(sub)}', '${window.esc(cat)}')" class="text-gray-300 hover:text-blue-500 p-1 rounded transition opacity-0 group-hover/sub:opacity-100" title="Rename"><i data-lucide="pencil" class="w-3 h-3"></i></button>` : ''}</h4>`;
-                    
-                    if (itemNames.length === 0) {
-                        html += `<div class="text-xs text-gray-300 italic pl-4 py-2 border border-dashed border-gray-200 rounded">No items in this category yet.</div>`;
-                    } else {
-                        html += `<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">`;
-                        
-                        itemNames.forEach(name => {
-                            const items = grouped[cat][sub][name];
-                            items.sort((a,b) => a.equipmentId.localeCompare(b.equipmentId, undefined, {numeric: true}));
-                            
-                            const stockCount = items.filter(i => !i.locationId).length;
-                            const totalCount = items.length;
-                            const hasStock = stockCount > 0;
-                            
-                            const cardBg = hasStock || isDisposalMode ? "bg-white" : "bg-gray-50 opacity-90";
-                            const badgeColor = hasStock ? "bg-blue-100 text-blue-700" : (isDisposalMode ? "bg-red-100 text-red-700" : "bg-gray-200 text-gray-600");
-                            const badgeText = isDisposalMode ? `${totalCount} Pulled Out` : (hasStock ? `${stockCount} In Stock` : `No Stock (0/${totalCount})`);
-
-                            let itemsListHtml = '';
-                            
-                            // UPDATED LOGIC: Filter items based on assignment status
-                            let itemsToShow = items;
-                            if (!isDisposalMode) {
-                                // Only show unassigned items in active mode
-                                itemsToShow = items.filter(i => !i.locationId);
-                            }
-
-                            if (itemsToShow.length > 0) {
-                                itemsListHtml = itemsToShow.map((i, index) => {
-                                    const statusColor = i.condition === 'Defective' ? 'bg-red-500' : 'bg-green-500';
-                                    const isLastItem = index === itemsToShow.length - 1;
-
-                                    let actionButtons = '';
-                                    if (!isDisposalMode) {
-                                        actionButtons = `
-                                            <button onclick="app.openMoveItemModal('${i.id}')" class="text-gray-400 hover:text-blue-600 p-1" title="Move Location">
-                                                <i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i>
-                                            </button>
-                                            ${isLastItem ? `
-                                            <button onclick="app.deleteItem('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', false)" class="text-gray-300 hover:text-red-500 p-1" title="Delete (Reuse ID)">
-                                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                                            </button>` : '<span class="w-5.5 inline-block"></span>'} 
-                                            `;
-                                    } else {
-                                        actionButtons = `
-                                            <button onclick="app.toggleDisposal('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', true)" class="text-green-600 hover:text-green-800 p-1" title="Restore to Inventory">
-                                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-                                            </button>
-                                            <button onclick="app.deleteItem('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', true)" class="text-red-400 hover:text-red-700 p-1" title="Delete Permanently">
-                                                <i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
-                                            </button>`;
-                                    }
-
-                                    return `
-                                    <div class="flex justify-between items-center text-xs p-2 bg-gray-50 rounded border border-gray-100 hover:border-blue-200 transition group/item">
-                                        <div class="flex items-center gap-2 flex-1 min-w-0">
-                                            <button onclick="app.toggleCondition('${i.id}', '${i.condition || 'Working'}')" class="w-2.5 h-2.5 rounded-full ${statusColor} hover:scale-125 transition flex-none" title="${i.condition || 'Working'} (Click to toggle)"></button>
-                                            <span class="font-mono font-bold text-blue-600 flex-none">${i.equipmentId}</span>
-                                            ${!isDisposalMode ? `<div class="truncate pl-2 text-[10px] text-right flex-1 text-gray-400 italic">In Storage</div>` : ''}
-                                        </div>
-                                        <div class="flex gap-1 pl-2 transition">
-                                            ${actionButtons}
-                                        </div>
-                                    </div>
-                                `}).join('');
-                            } else {
-                                // Show "No stock" message if list is empty but card exists
-                                const msg = isDisposalMode ? "No items" : "No stock available";
-                                itemsListHtml = `<div class="text-[10px] text-gray-400 italic text-center py-4 bg-gray-50 rounded border border-dashed border-gray-200 leading-relaxed">${msg}</div>`;
-                            }
-
-                            html += `
-                            <div class="${cardBg} border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 flex flex-col h-full relative group/card">
-                                <div class="flex justify-between items-start mb-3 pb-2 border-b border-gray-100">
-                                    <div>
-                                        <h3 class="font-bold text-gray-900 text-sm leading-tight pr-2 flex items-center gap-1">
-                                            ${name}
-                                            ${!isDisposalMode ? `<button onclick="app.openEditItemNameModal('${items[0].id}')" class="text-gray-300 hover:text-blue-600 ml-1 inline-block"><i data-lucide="pencil" class="w-3 h-3"></i></button>` : ''}
-                                        </h3>
-                                        <span class="${badgeColor} text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1">${badgeText}</span>
-                                    </div>
-                                    ${!isDisposalMode ? `<button onclick="app.openAddStockModal('${window.esc(cat)}', '${window.esc(sub)}', '${window.esc(name)}')" class="text-blue-600 hover:bg-blue-50 p-1 rounded-full transition" title="Add Stock"><i data-lucide="plus-circle" class="w-5 h-5"></i></button>` : ''}
-                                </div>
-                                <div class="flex-1 overflow-y-auto max-h-48 space-y-1 custom-scrollbar pr-1">${itemsListHtml}</div>
-                            </div>`;
-                        });
-                        html += `</div>`;
-                    }
-                    html += `</div>`;
-                });
-                html += `</div></div>`;
-            });
-            return html;
-        }
+        function generateInventoryItems() { const term = state.searchTerm.toLowerCase(); const isDisposalMode = state.storageViewMode === 'disposal'; let filtered = state.inventory.filter(item => { const matchesMode = isDisposalMode ? item.isDisposed : !item.isDisposed; const matchesTerm = item.name.toLowerCase().includes(term) || item.equipmentId.toLowerCase().includes(term) || (item.category && item.category.toLowerCase().includes(term)); return matchesMode && matchesTerm; }); if (filtered.length === 0 && (state.masterData.categories || []).length === 0) { const emptyMsg = isDisposalMode ? "Pullout bin is empty." : "No active items found."; return `<div class="flex flex-col items-center justify-center py-20 text-gray-400"><i data-lucide="${isDisposalMode ? 'trash-2' : 'package-open'}" class="w-16 h-16 mb-4 opacity-20"></i><p>${emptyMsg}</p></div>`; } const grouped = {}; if (!isDisposalMode) { (state.masterData.categories || []).forEach(cat => { grouped[cat.name] = {}; if(cat.subs) { cat.subs.forEach(sub => { grouped[cat.name][sub] = {}; }); } }); } filtered.forEach(item => { const cat = item.category || 'Uncategorized'; const sub = item.subCategory || 'General'; const name = item.name || 'Unnamed'; if (!grouped[cat]) grouped[cat] = {}; if (!grouped[cat][sub]) grouped[cat][sub] = {}; if (!grouped[cat][sub][name]) grouped[cat][sub][name] = []; grouped[cat][sub][name].push(item); }); let html = ''; Object.keys(grouped).sort().forEach(cat => { const subKeys = Object.keys(grouped[cat]).sort(); html += `<div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm mb-4">`; html += `<div class="bg-gray-50 px-4 py-3 border-b border-gray-200 font-bold text-gray-700 flex items-center gap-2"><div class="flex items-center gap-2 flex-1"><i data-lucide="folder" class="w-4 h-4 text-blue-500"></i> ${cat}</div>${!isDisposalMode ? `<div class="flex gap-1"><button onclick="app.openRenameModal('category', '${window.esc(cat)}')" class="text-gray-300 hover:text-blue-500 p-1 rounded transition" title="Rename"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button></div>` : ''}</div>`; html += `<div class="p-4 space-y-4">`; if (subKeys.length === 0) { html += `<div class="text-xs text-gray-400 italic">No sub-categories defined.</div>`; } subKeys.forEach(sub => { const itemNames = Object.keys(grouped[cat][sub]).sort(); html += `<div class="space-y-3">`; html += `<h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 group/sub"><span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span> ${sub}${!isDisposalMode ? `<button onclick="app.openAddItemModal({category: '${window.esc(cat)}', subCategory: '${window.esc(sub)}'})" class="text-gray-300 hover:text-blue-600 p-1 rounded transition opacity-0 group-hover/sub:opacity-100" title="Add New Item to ${sub}"><i data-lucide="plus-circle" class="w-3.5 h-3.5"></i></button><button onclick="app.openRenameModal('subCategory', '${window.esc(sub)}', '${window.esc(cat)}')" class="text-gray-300 hover:text-blue-500 p-1 rounded transition opacity-0 group-hover/sub:opacity-100" title="Rename"><i data-lucide="pencil" class="w-3 h-3"></i></button>` : ''}</h4>`; if (itemNames.length === 0) { html += `<div class="text-xs text-gray-300 italic pl-4 py-2 border border-dashed border-gray-200 rounded">No items in this category yet.</div>`; } else { html += `<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">`; itemNames.forEach(name => { const items = grouped[cat][sub][name]; items.sort((a,b) => a.equipmentId.localeCompare(b.equipmentId, undefined, {numeric: true})); const stockCount = items.filter(i => !i.locationId).length; const totalCount = items.length; const hasStock = stockCount > 0; const cardBg = "bg-white"; const badgeColor = hasStock ? "bg-blue-100 text-blue-700" : (isDisposalMode ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"); let badgeText = ""; if (isDisposalMode) { badgeText = `${totalCount} Pulled Out`; } else { if (hasStock) { badgeText = `${stockCount} Available`; } else { badgeText = "No Stock"; } } let itemsListHtml = ''; let itemsToShow = items; if (!isDisposalMode) { itemsToShow = items.filter(i => !i.locationId); } if (itemsToShow.length > 0) { itemsListHtml = itemsToShow.map((i, index) => { const statusColor = i.condition === 'Defective' ? 'bg-red-500' : 'bg-green-500'; const isLastItem = index === itemsToShow.length - 1; let actionButtons = ''; if (!isDisposalMode) { actionButtons = `<button onclick="app.openMoveItemModal('${i.id}')" class="text-gray-400 hover:text-blue-600 p-1" title="Move Location"><i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i></button>${isLastItem ? `<button onclick="app.deleteItem('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', false)" class="text-gray-300 hover:text-red-500 p-1" title="Delete (Reuse ID)"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : '<span class="w-5.5 inline-block"></span>'}`; } else { actionButtons = `<button onclick="app.toggleDisposal('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', true)" class="text-green-600 hover:text-green-800 p-1" title="Restore to Inventory"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i></button><button onclick="app.deleteItem('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', true)" class="text-red-400 hover:text-red-700 p-1" title="Delete Permanently"><i data-lucide="x-circle" class="w-3.5 h-3.5"></i></button>`; } return `<div class="flex justify-between items-center text-xs p-2 bg-gray-50 rounded border border-gray-100 hover:border-blue-200 transition group/item"><div class="flex items-center gap-2 flex-1 min-w-0"><button onclick="app.toggleCondition('${i.id}', '${i.condition || 'Working'}')" class="w-2.5 h-2.5 rounded-full ${statusColor} hover:scale-125 transition flex-none" title="${i.condition || 'Working'} (Click to toggle)"></button><span class="font-mono font-bold text-blue-600 flex-none">${i.equipmentId}</span>${!isDisposalMode ? `<div class="truncate pl-2 text-[10px] text-right flex-1 text-gray-400 italic">In Storage</div>` : ''}</div><div class="flex gap-1 pl-2 transition">${actionButtons}</div></div>`}).join(''); } else { const msg = isDisposalMode ? "No items" : "No stock available"; itemsListHtml = `<div class="text-[10px] text-gray-400 italic text-center py-4 bg-gray-50 rounded border border-dashed border-gray-200 leading-relaxed">${msg}</div>`; } html += `<div class="${cardBg} border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 flex flex-col h-full relative group/card"><div class="flex justify-between items-start mb-3 pb-2 border-b border-gray-100"><div><h3 class="font-bold text-gray-900 text-sm leading-tight pr-2 flex items-center gap-1">${name}${!isDisposalMode ? `<button onclick="app.openEditItemNameModal('${items[0].id}')" class="text-gray-300 hover:text-blue-600 ml-1 inline-block"><i data-lucide="pencil" class="w-3 h-3"></i></button>` : ''}</h3><span class="${badgeColor} text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1">${badgeText}</span></div>${!isDisposalMode ? `<button onclick="app.openAddStockModal('${window.esc(cat)}', '${window.esc(sub)}', '${window.esc(name)}')" class="text-blue-600 hover:bg-blue-50 p-1 rounded-full transition" title="Add Stock"><i data-lucide="plus-circle" class="w-5 h-5"></i></button>` : ''}</div><div class="flex-1 overflow-y-auto max-h-48 space-y-1 custom-scrollbar pr-1">${itemsListHtml}</div></div>`; }); html += `</div>`; } html += `</div>`; }); html += `</div></div>`; }); return html; }
 
         // --- Global App Object ---
         window.app = {
@@ -1067,6 +487,11 @@
                 e.preventDefault();
                 const email = e.target.email.value;
                 const password = e.target.password.value;
+                
+                state.loadingAuth = true;
+                document.getElementById('auth-container').innerHTML = generateAuthView(); // update loading state
+                lucide.createIcons();
+
                 try {
                     await signInWithEmailAndPassword(auth, email, password);
                     // Reset attempts on success (this line runs only if success)
@@ -1074,10 +499,21 @@
                     showToast("Signed In Successfully");
                 } catch (error) {
                     state.loginAttempts++;
-                    showToast("Login failed. Check credentials.", 'error');
-                    // Refresh view to show potential forgot password message
-                    document.getElementById('auth-container').innerHTML = generateAuthView();
-                    lucide.createIcons();
+                    let msg = "Login failed. Check credentials.";
+                    if (error.code === 'auth/user-not-found') msg = "User not found. Register first?";
+                    if (error.code === 'auth/wrong-password') msg = "Incorrect password.";
+                    if (error.code === 'auth/operation-not-allowed') {
+                         msg = `Error: Email/Password login is disabled for project "${firebaseConfig.projectId}". Please check your Firebase Console.`;
+                         alert(msg);
+                    }
+                    showToast(msg, 'error');
+                } finally {
+                    state.loadingAuth = false;
+                    // Only refresh view if still on auth screen (not logged in)
+                    if (!auth.currentUser) {
+                         document.getElementById('auth-container').innerHTML = generateAuthView();
+                         lucide.createIcons();
+                    }
                 }
             },
             handleRegister: async (e) => {
@@ -1085,38 +521,76 @@
                 const nickname = e.target.nickname.value.trim();
                 const email = e.target.email.value;
                 const password = e.target.password.value;
+                const role = e.target.role ? e.target.role.value : 'Live Operator'; // Default if not selected
+                
                 if (!nickname) return showToast("Nickname is required", 'error');
+                if (!role) return showToast("Role is required", 'error');
+
+                state.loadingAuth = true;
+                document.getElementById('auth-container').innerHTML = generateAuthView(); 
+                lucide.createIcons();
                 
                 try {
                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                    await updateProfile(userCredential.user, { displayName: nickname });
+                    const user = userCredential.user;
+                    
+                    // Update Profile
+                    await updateProfile(user, { displayName: nickname });
+                    
+                    // Save Role to Firestore
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', user.uid), {
+                        role: role,
+                        email: email,
+                        nickname: nickname
+                    });
+
                     showToast(`Welcome, ${nickname}!`);
-                    // Force refresh of state just in case
-                    state.user = { ...userCredential.user, displayName: nickname };
-                    app.init(); // Re-trigger UI update
+                    // state.user will be set by onAuthStateChanged
                 } catch (error) {
-                    showToast(error.message, 'error');
+                    console.error("Registration Error:", error);
+                    let msg = error.message;
+                    if (error.code === 'auth/email-already-in-use') msg = "Email already in use. Please sign in.";
+                    if (error.code === 'auth/weak-password') msg = "Password is too weak (min 6 chars).";
+                    if (error.code === 'auth/operation-not-allowed') {
+                        msg = `SETUP REQUIRED: Enable 'Email/Password' in Firebase Console for project "${firebaseConfig.projectId}".`;
+                        alert(msg); // Force alert for visibility
+                    }
+                    
+                    showToast(msg, 'error');
+                } finally {
+                    state.loadingAuth = false;
+                    if (!auth.currentUser) {
+                        document.getElementById('auth-container').innerHTML = generateAuthView();
+                        lucide.createIcons();
+                    }
                 }
             },
             handleForgotPassword: async (e) => {
                 e.preventDefault();
                 const email = e.target.email.value.trim();
                 if (!email) return showToast("Please enter your email", 'error');
+                
+                state.loadingAuth = true;
+                document.getElementById('auth-container').innerHTML = generateAuthView();
+                
                 try {
                     await sendPasswordResetEmail(auth, email);
                     showToast("Reset link sent! Check your inbox.");
                     state.authMode = 'login';
                     state.loginAttempts = 0; // Reset attempts after sending
-                    document.getElementById('auth-container').innerHTML = generateAuthView();
-                    lucide.createIcons();
                 } catch (error) {
                     showToast(error.message, 'error');
+                } finally {
+                    state.loadingAuth = false;
+                    document.getElementById('auth-container').innerHTML = generateAuthView();
+                    lucide.createIcons();
                 }
             },
             handleLogout: async () => {
                 try {
                     await signOut(auth);
                     showToast("Logged Out");
+                    state.userRole = null; // Clear role on logout
                 } catch (error) {
                     console.error(error);
                 }
@@ -1155,6 +629,13 @@
                     if (updated) {
                         // Manually update local state to reflect immediately
                         state.user = { ...user, displayName: nickname, email: email };
+                        // Also update role doc if needed (for consistency)
+                         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', user.uid), {
+                            role: state.userRole,
+                            email: email,
+                            nickname: nickname
+                        }, { merge: true });
+
                         await logActivity('Profile Updated', `User profile updated: ${changes.join(', ')}`);
                         showToast("Profile Updated");
                         app.closeModal();
@@ -1375,6 +856,9 @@
 
             submitAddItem: async (e) => {
                 e.preventDefault();
+                // Security Check
+                if (!isManager()) return showToast("Unauthorized: Only managers can add items.", 'error');
+
                 const form = e.target;
                 const quantity = parseInt(form.quantity.value) || 1;
                 let currentIdString = form.equipmentId.value.trim().toUpperCase(); 
@@ -1496,25 +980,78 @@
                 } catch (err) { console.error(err); showToast("Error saving items.", 'error'); }
             },
 
-            submitEditItemName: async (e, oldName, category, subCategory) => { e.preventDefault(); const newName = e.target.newName.value.trim(); if (!newName || newName === oldName) { app.closeModal(); return; } const itemsToUpdate = state.inventory.filter(i => i.name === oldName && i.category === category && i.subCategory === subCategory); if (itemsToUpdate.length === 0) return; try { const batch = writeBatch(db); itemsToUpdate.forEach(item => { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id); batch.update(ref, { name: newName }); }); await batch.commit(); await logActivity('Item Renamed', `Renamed "${oldName}" to "${newName}" (${itemsToUpdate.length} items)`); app.closeModal(); showToast("Items Renamed"); } catch (err) { console.error(err); showToast("Error renaming items", 'error'); } },
+            submitEditItemName: async (e, oldName, category, subCategory) => { 
+                e.preventDefault(); 
+                if (!isManager()) return showToast("Unauthorized: Only managers can rename items.", 'error');
+
+                const newName = e.target.newName.value.trim(); if (!newName || newName === oldName) { app.closeModal(); return; } const itemsToUpdate = state.inventory.filter(i => i.name === oldName && i.category === category && i.subCategory === subCategory); if (itemsToUpdate.length === 0) return; try { const batch = writeBatch(db); itemsToUpdate.forEach(item => { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id); batch.update(ref, { name: newName }); }); await batch.commit(); await logActivity('Item Renamed', `Renamed "${oldName}" to "${newName}" (${itemsToUpdate.length} items)`); app.closeModal(); showToast("Items Renamed"); } catch (err) { console.error(err); showToast("Error renaming items", 'error'); } 
+            },
+
             submitSwap: async (sourceId, targetId, swapType) => { if (!targetId || sourceId === targetId) return; try { const batch = writeBatch(db); const sourceItems = state.inventory.filter(i => i.locationId === sourceId); const targetItems = state.inventory.filter(i => i.locationId === targetId); sourceItems.forEach(item => { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id); batch.update(ref, { locationId: targetId }); }); targetItems.forEach(item => { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id); batch.update(ref, { locationId: sourceId }); }); const sourceName = getLocationNamePlain(sourceId); const targetName = getLocationNamePlain(targetId); if (swapType === 'room') { const sourceLoc = state.locations.find(l => l.id === sourceId); const targetLoc = state.locations.find(l => l.id === targetId); if (sourceLoc && targetLoc) { const sourceRef = doc(db, 'artifacts', appId, 'public', 'data', 'locations', sourceId); const targetRef = doc(db, 'artifacts', appId, 'public', 'data', 'locations', targetId); batch.update(sourceRef, { name: targetLoc.name, status: targetLoc.status || 'vacant' }); batch.update(targetRef, { name: sourceLoc.name, status: sourceLoc.status || 'vacant' }); } } await batch.commit(); await logActivity('Swap Executed', `Swapped ${swapType} between ${sourceName} and ${targetName}`); app.closeModal(); showToast("Swap Complete"); } catch (err) { console.error(err); showToast("Failed to swap.", 'error'); } },
-            updateRoomStatus: async (locationId, newStatus) => { try { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'locations', locationId); await updateDoc(ref, { status: newStatus }); const locName = getLocationNamePlain(locationId); await logActivity('Status Changed', `${locName} status set to ${newStatus}`); } catch (err) { console.error(err); showToast("Error updating status", 'error'); } },
+
+            updateRoomStatus: async (locationId, newStatus) => { 
+                if (!isManager()) return showToast("Unauthorized: Only managers can update status.", 'error');
+                try { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'locations', locationId); await updateDoc(ref, { status: newStatus }); const locName = getLocationNamePlain(locationId); await logActivity('Status Changed', `${locName} status set to ${newStatus}`); } catch (err) { console.error(err); showToast("Error updating status", 'error'); } 
+            },
+
             refreshModal: () => { if (state.currentModal && state.currentModal.type === 'locationDetail') { renderModal(state.currentModal.type, state.currentModal.data); } },
             toggleCondition: async (id, currentCondition) => { const newCondition = currentCondition === 'Working' ? 'Defective' : 'Working'; try { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id); await updateDoc(ref, { condition: newCondition }); showToast(`Condition set to ${newCondition}`); } catch (e) { console.error(e); showToast('Error updating condition', 'error'); } },
-            deleteItem: (id, name, equipId, permanent) => { const doDelete = async () => { try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id)); if (permanent) { const retiredRef = doc(db, 'artifacts', appId, 'public', 'data', 'global_settings', 'masterData'); const currentRetired = state.masterData.retiredIds || []; if (!currentRetired.includes(equipId)) { await updateDoc(retiredRef, { retiredIds: [...currentRetired, equipId] }); } } await logActivity('Item Deleted', `Deleted ${name} (${equipId}) ${permanent ? 'permanently' : ''}`); showToast('Item deleted'); } catch(e) { console.error(e); showToast('Delete failed', 'error'); } }; app.openConfirmModal(`Are you sure you want to delete ${name}?`, doDelete); },
-            toggleDisposal: async (id, name, equipId, restore) => { try { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id); await updateDoc(ref, { isDisposed: !restore, locationId: null }); await logActivity('Item Status', `${restore ? 'Restored' : 'Disposed'} ${name} (${equipId})`); showToast(restore ? 'Item Restored' : 'Item Disposed'); } catch(e) { console.error(e); showToast('Action failed', 'error'); } },
+
+            deleteItem: (id, name, equipId, permanent) => { 
+                const doDelete = async () => { 
+                    if (!isManager()) return showToast("Unauthorized", 'error');
+                    try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id)); if (permanent) { const retiredRef = doc(db, 'artifacts', appId, 'public', 'data', 'global_settings', 'masterData'); const currentRetired = state.masterData.retiredIds || []; if (!currentRetired.includes(equipId)) { await updateDoc(retiredRef, { retiredIds: [...currentRetired, equipId] }); } } await logActivity('Item Deleted', `Deleted ${name} (${equipId}) ${permanent ? 'permanently' : ''}`); showToast('Item deleted'); } catch(e) { console.error(e); showToast('Delete failed', 'error'); } }; app.openConfirmModal(`Are you sure you want to delete ${name}?`, doDelete); 
+            },
+
+            toggleDisposal: async (id, name, equipId, restore) => { 
+                if (!isManager()) return showToast("Unauthorized", 'error');
+                try { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id); await updateDoc(ref, { isDisposed: !restore, locationId: null }); await logActivity('Item Status', `${restore ? 'Restored' : 'Disposed'} ${name} (${equipId})`); showToast(restore ? 'Item Restored' : 'Item Disposed'); } catch(e) { console.error(e); showToast('Action failed', 'error'); } 
+            },
+
             submitMoveItem: async (itemId, locationId, name, equipId) => { try { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', itemId); if (locationId === 'PULLOUT') { await updateDoc(ref, { isDisposed: true, locationId: null }); await logActivity('Item Moved', `Moved ${name} (${equipId}) to Pullout`); } else { const finalLoc = locationId === "" ? null : locationId; await updateDoc(ref, { locationId: finalLoc, isDisposed: false }); const locName = getLocationNamePlain(finalLoc); await logActivity('Item Moved', `Moved ${name} (${equipId}) to ${locName}`); } app.closeModal(); showToast('Item moved'); } catch(e) { console.error(e); showToast('Move failed', 'error'); } },
-            submitAddLocation: async (e) => { e.preventDefault(); const form = e.target; try { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'locations'), { type: form.type.value, parentId: form.parentId.value || null, name: form.name.value, customId: form.customId ? form.customId.value : null, status: form.status ? form.status.value : null, createdAt: new Date().toISOString() }); await logActivity('Location Created', `Created ${form.type.value}: ${form.name.value}`); app.closeModal(); showToast('Location created'); } catch(e) { console.error(e); showToast('Error creating location', 'error'); } },
-            submitEditLocation: async (e, id) => { e.preventDefault(); const form = e.target; try { const updateData = { name: form.name.value }; if (form.customId) updateData.customId = form.customId.value; await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', id), updateData); await logActivity('Location Updated', `Updated location: ${form.name.value}`); app.closeModal(); showToast('Location updated'); } catch(e) { console.error(e); showToast('Error updating location', 'error'); } },
-            deleteLocation: (id) => { const doDelete = async () => { try { const items = state.inventory.filter(i => i.locationId === id); const batch = writeBatch(db); items.forEach(i => { batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { locationId: null }); }); batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'locations', id)); await batch.commit(); await logActivity('Location Deleted', `Deleted location ID: ${id}`); app.closeModal(); showToast('Location deleted'); } catch(e) { console.error(e); showToast('Delete failed', 'error'); } }; app.openConfirmModal("Delete this location? Items will be moved to Storage.", doDelete); },
+
+            submitAddLocation: async (e) => { 
+                e.preventDefault(); 
+                if (!isManager()) return showToast("Unauthorized", 'error');
+                const form = e.target; try { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'locations'), { type: form.type.value, parentId: form.parentId.value || null, name: form.name.value, customId: form.customId ? form.customId.value : null, status: form.status ? form.status.value : null, createdAt: new Date().toISOString() }); await logActivity('Location Created', `Created ${form.type.value}: ${form.name.value}`); app.closeModal(); showToast('Location created'); } catch(e) { console.error(e); showToast('Error creating location', 'error'); } 
+            },
+
+            submitEditLocation: async (e, id) => { 
+                e.preventDefault(); 
+                if (!isManager()) return showToast("Unauthorized", 'error');
+                const form = e.target; try { const updateData = { name: form.name.value }; if (form.customId) updateData.customId = form.customId.value; await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', id), updateData); await logActivity('Location Updated', `Updated location: ${form.name.value}`); app.closeModal(); showToast('Location updated'); } catch(e) { console.error(e); showToast('Error updating location', 'error'); } 
+            },
+
+            deleteLocation: (id) => { 
+                const doDelete = async () => { 
+                    if (!isManager()) return showToast("Unauthorized", 'error');
+                    try { const items = state.inventory.filter(i => i.locationId === id); const batch = writeBatch(db); items.forEach(i => { batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { locationId: null }); }); batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'locations', id)); await batch.commit(); await logActivity('Location Deleted', `Deleted location ID: ${id}`); app.closeModal(); showToast('Location deleted'); } catch(e) { console.error(e); showToast('Delete failed', 'error'); } }; app.openConfirmModal("Delete this location? Items will be moved to Storage.", doDelete); 
+            },
+
             submitAddItems: async (e, locationId) => { e.preventDefault(); const form = e.target; const checkboxes = form.querySelectorAll('input[name="selectedItems"]:checked'); if (checkboxes.length === 0) return; try { const batch = writeBatch(db); checkboxes.forEach(cb => { batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', cb.value), { locationId: locationId || null }); }); await batch.commit(); await logActivity('Items Moved', `Moved ${checkboxes.length} items to ${getLocationNamePlain(locationId)}`); app.closeModal(); showToast(`${checkboxes.length} items moved`); } catch(e) { console.error(e); showToast('Move failed', 'error'); } },
-            submitManageCategory: async (e, action, oldName) => { e.preventDefault(); const newName = e.target.name.value.trim(); if(!newName) return; let cats = [...(state.masterData.categories || [])]; let logDetails = ''; if (action === 'add') { if(cats.some(c => c.name === newName)) return alert('Category exists'); cats.push({ name: newName, subs: [] }); logDetails = `Created category: ${newName}`; } else if (action === 'rename') { const idx = cats.findIndex(c => c.name === oldName); if(idx === -1) return; cats[idx].name = newName; const batch = writeBatch(db); const items = state.inventory.filter(i => i.category === oldName); items.forEach(i => { batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { category: newName }); }); await batch.commit(); logDetails = `Renamed category '${oldName}' to '${newName}'`; } state.masterData.categories = cats; await saveMasterData(); if(logDetails) await logActivity('Settings Update', logDetails); app.closeModal(); showToast('Category updated'); },
-            submitManageSubCategory: async (e, action, parentCat, oldName) => { e.preventDefault(); const newName = e.target.name.value.trim(); if(!newName) return; let cats = [...(state.masterData.categories || [])]; const catIdx = cats.findIndex(c => c.name === parentCat); if(catIdx === -1) return; let subs = cats[catIdx].subs || []; let logDetails = ''; if(action === 'add') { if(subs.includes(newName)) return alert('Sub-category exists'); subs.push(newName); logDetails = `Added sub-category '${newName}' to '${parentCat}'`; } else if (action === 'rename') { const idx = subs.indexOf(oldName); if(idx === -1) return; subs[idx] = newName; const batch = writeBatch(db); const items = state.inventory.filter(i => i.category === parentCat && i.subCategory === oldName); items.forEach(i => { batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { subCategory: newName }); }); await batch.commit(); logDetails = `Renamed sub-category '${oldName}' to '${newName}' in '${parentCat}'`; } cats[catIdx].subs = subs; state.masterData.categories = cats; await saveMasterData(); if(logDetails) await logActivity('Settings Update', logDetails); app.closeModal(); showToast('Sub-category updated'); },
-            submitMoveSubCategory: async (e, subName, currentParent) => { e.preventDefault(); const newParent = e.target.newParent.value; if(!newParent || newParent === currentParent) return; let cats = [...(state.masterData.categories || [])]; const oldCatIdx = cats.findIndex(c => c.name === currentParent); if(oldCatIdx !== -1) { cats[oldCatIdx].subs = cats[oldCatIdx].subs.filter(s => s !== subName); } const newCatIdx = cats.findIndex(c => c.name === newParent); if(newCatIdx !== -1) { if(!cats[newCatIdx].subs) cats[newCatIdx].subs = []; if(!cats[newCatIdx].subs.includes(subName)) cats[newCatIdx].subs.push(subName); } const batch = writeBatch(db); const items = state.inventory.filter(i => i.category === currentParent && i.subCategory === subName); items.forEach(i => { batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { category: newParent }); }); await batch.commit(); state.masterData.categories = cats; await saveMasterData(); await logActivity('Settings Update', `Moved sub-category '${subName}' from '${currentParent}' to '${newParent}'`); app.closeModal(); showToast('Sub-category moved'); },
+
+            submitManageCategory: async (e, action, oldName) => { 
+                e.preventDefault(); 
+                if (!isManager()) return showToast("Unauthorized", 'error');
+                const newName = e.target.name.value.trim(); if(!newName) return; let cats = [...(state.masterData.categories || [])]; let logDetails = ''; if (action === 'add') { if(cats.some(c => c.name === newName)) return alert('Category exists'); cats.push({ name: newName, subs: [] }); logDetails = `Created category: ${newName}`; } else if (action === 'rename') { const idx = cats.findIndex(c => c.name === oldName); if(idx === -1) return; cats[idx].name = newName; const batch = writeBatch(db); const items = state.inventory.filter(i => i.category === oldName); items.forEach(i => { batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { category: newName }); }); await batch.commit(); logDetails = `Renamed category '${oldName}' to '${newName}'`; } state.masterData.categories = cats; await saveMasterData(); if(logDetails) await logActivity('Settings Update', logDetails); app.closeModal(); showToast('Category updated'); 
+            },
+
+            submitManageSubCategory: async (e, action, parentCat, oldName) => { 
+                e.preventDefault(); 
+                if (!isManager()) return showToast("Unauthorized", 'error');
+                const newName = e.target.name.value.trim(); if(!newName) return; let cats = [...(state.masterData.categories || [])]; const catIdx = cats.findIndex(c => c.name === parentCat); if(catIdx === -1) return; let subs = cats[catIdx].subs || []; let logDetails = ''; if(action === 'add') { if(subs.includes(newName)) return alert('Sub-category exists'); subs.push(newName); logDetails = `Added sub-category '${newName}' to '${parentCat}'`; } else if (action === 'rename') { const idx = subs.indexOf(oldName); if(idx === -1) return; subs[idx] = newName; const batch = writeBatch(db); const items = state.inventory.filter(i => i.category === parentCat && i.subCategory === oldName); items.forEach(i => { batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { subCategory: newName }); }); await batch.commit(); logDetails = `Renamed sub-category '${oldName}' to '${newName}' in '${parentCat}'`; } cats[catIdx].subs = subs; state.masterData.categories = cats; await saveMasterData(); if(logDetails) await logActivity('Settings Update', logDetails); app.closeModal(); showToast('Sub-category updated'); 
+            },
+
+            submitMoveSubCategory: async (e, subName, currentParent) => { 
+                e.preventDefault(); 
+                if (!isManager()) return showToast("Unauthorized", 'error');
+                const newParent = e.target.newParent.value; if(!newParent || newParent === currentParent) return; let cats = [...(state.masterData.categories || [])]; const oldCatIdx = cats.findIndex(c => c.name === currentParent); if(oldCatIdx !== -1) { cats[oldCatIdx].subs = cats[oldCatIdx].subs.filter(s => s !== subName); } const newCatIdx = cats.findIndex(c => c.name === newParent); if(newCatIdx !== -1) { if(!cats[newCatIdx].subs) cats[newCatIdx].subs = []; if(!cats[newCatIdx].subs.includes(subName)) cats[newCatIdx].subs.push(subName); } const batch = writeBatch(db); const items = state.inventory.filter(i => i.category === currentParent && i.subCategory === subName); items.forEach(i => { batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { category: newParent }); }); await batch.commit(); state.masterData.categories = cats; await saveMasterData(); await logActivity('Settings Update', `Moved sub-category '${subName}' from '${currentParent}' to '${newParent}'`); app.closeModal(); showToast('Sub-category moved'); 
+            },
             
             // --- FIXES HERE: Replacing confirm() with app.openConfirmModal() ---
             deleteMasterCategory: async (name) => { 
                 const doDelete = async () => {
+                    if (!isManager()) return showToast("Unauthorized", 'error');
                     let cats = (state.masterData.categories || []).filter(c => c.name !== name); 
                     state.masterData.categories = cats; 
                     await saveMasterData(); 
@@ -1526,6 +1063,7 @@
             
             deleteMasterSubCategory: async (catName, subName) => { 
                 const doDelete = async () => {
+                    if (!isManager()) return showToast("Unauthorized", 'error');
                     let cats = [...(state.masterData.categories || [])]; 
                     const idx = cats.findIndex(c => c.name === catName); 
                     if(idx !== -1) { 
@@ -1670,6 +1208,18 @@
                     }
                 }
             });
+
+            // RBAC: Hide Settings Navigation if not manager
+            const sidebarSettings = document.getElementById('sidebar-settings-container');
+            const mobSettings = document.getElementById('mob-settings');
+            
+            if (state.userRole && !isManager()) {
+                if(sidebarSettings) sidebarSettings.classList.add('hidden');
+                if(mobSettings) mobSettings.classList.add('hidden');
+            } else {
+                if(sidebarSettings) sidebarSettings.classList.remove('hidden');
+                if(mobSettings) mobSettings.classList.remove('hidden');
+            }
         }
 
         function renderStorageList() {
@@ -1686,6 +1236,13 @@
             
             if (state.loading) return;
 
+            // RBAC Redirect if unauthorized access to settings
+            if (state.activeTab === 'settings' && !isManager()) {
+                app.setActiveTab('dashboard');
+                showToast("Access Denied: Settings restricted", "error");
+                return;
+            }
+
             if (state.activeTab === 'dashboard') {
                 title.innerText = "Dashboard";
                 main.innerHTML = generateDashboardView();
@@ -1694,13 +1251,13 @@
                 main.innerHTML = generateStorageView();
             } else if (state.activeTab === 'floors') {
                 title.innerText = "Floor Management";
-                main.innerHTML = generateFloorsView(); // Now Defined
+                main.innerHTML = generateFloorsView(); 
             } else if (state.activeTab === 'boxes') {
                 title.innerText = "Box Index";
-                main.innerHTML = generateBoxesView(); // Now Defined
+                main.innerHTML = generateBoxesView();
             } else if (state.activeTab === 'activity') {
                 title.innerText = "Activity Logs";
-                main.innerHTML = generateActivityLogView(); // Now Defined
+                main.innerHTML = generateActivityLogView();
             } else if (state.activeTab === 'settings') {
                 title.innerText = "Settings";
                 main.innerHTML = generateSettingsView();
@@ -1723,7 +1280,7 @@
 
         // Initialization
         async function init() {
-            onAuthStateChanged(auth, (u) => {
+            onAuthStateChanged(auth, async (u) => {
                 state.user = u;
                 
                 const authContainer = document.getElementById('auth-container');
@@ -1731,8 +1288,25 @@
                 const mainApp = document.getElementById('app-main');
                 const userDisplay = document.getElementById('header-user-name');
                 const mobileUserDisplay = document.getElementById('header-user-name-mobile');
+                const userRoleDisplay = document.getElementById('header-user-role');
+                const mobileUserRoleDisplay = document.getElementById('header-user-role-mobile');
 
                 if (u) {
+                    // Fetch User Role
+                    try {
+                        const roleDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', u.uid));
+                        if (roleDoc.exists()) {
+                            state.userRole = roleDoc.data().role;
+                            state.user.displayName = roleDoc.data().nickname || u.displayName; // Ensure nickname is fresh
+                        } else {
+                            // Fallback if no role doc exists (legacy users or direct firebase auth)
+                            state.userRole = 'Live Operator'; 
+                        }
+                    } catch (e) {
+                        console.error("Error fetching role:", e);
+                        state.userRole = 'Live Operator';
+                    }
+
                     // Logged In
                     authContainer.classList.add('hidden');
                     
@@ -1741,11 +1315,15 @@
                     sidebar.classList.add('md:flex');
                     
                     mainApp.classList.remove('hidden');
-                    const name = u.displayName || u.email || 'User';
+                    const name = state.user.displayName || state.user.email || 'User';
+                    
                     if(userDisplay) userDisplay.innerText = name;
                     if(mobileUserDisplay) mobileUserDisplay.innerText = name;
+                    if(userRoleDisplay) userRoleDisplay.innerText = state.userRole;
+                    if(mobileUserRoleDisplay) mobileUserRoleDisplay.innerText = state.userRole;
                     
                     startListeners();
+                    updateNavUI(); // Ensure nav reflects RBAC
                 } else {
                     // Logged Out
                     authContainer.classList.remove('hidden');
@@ -1758,6 +1336,7 @@
                     state.inventory = [];
                     state.locations = [];
                     state.logs = [];
+                    state.userRole = null;
                     lucide.createIcons();
                 }
             });
