@@ -413,7 +413,6 @@
 
         async function logActivity(action, details) {
             try {
-                // Use Nickname (displayName) if available, else email, else Anonymous
                 let userName = 'Anonymous';
                 if (state.user) {
                     userName = state.user.displayName || state.user.email || 'User';
@@ -462,10 +461,8 @@
                 }
 
                 if (preSub) {
-                     // Generate ID immediately using the smart logic
                      let prefix = preSub.split(' ').map(word => word[0]).join('').toUpperCase();
                      if (prefix.length < 2) prefix = preSub.substring(0, 2).toUpperCase();
-                     // Use the helper to find gap or new ID, respecting retired IDs
                      idValue = app.generateNextId(prefix);
                 }
                 
@@ -722,7 +719,6 @@
             const assignedItems = state.inventory.filter(i => !i.isDisposed && i.locationId).length;
             const unassignedItems = totalItems - assignedItems;
             
-            // Sub-Category Data for Chart
             const subCategories = {};
             state.inventory.filter(i => !i.isDisposed).forEach(i => {
                 const sub = i.subCategory || 'General';
@@ -736,51 +732,51 @@
 
             return `
             <div class="space-y-6 fade-in max-w-7xl mx-auto">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                    <div class="bg-white p-4 md:p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-full">
                         <div>
                             <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Active</p>
-                            <h3 class="text-2xl font-bold text-gray-800 mt-1">${totalItems}</h3>
+                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1">${totalItems}</h3>
                         </div>
-                        <div class="p-3 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="package" class="w-6 h-6"></i></div>
+                        <div class="self-end p-2 bg-blue-50 text-blue-600 rounded-lg mt-2"><i data-lucide="package" class="w-5 h-5"></i></div>
                     </div>
-                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                    <div class="bg-white p-4 md:p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-full">
                         <div>
                             <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Assigned</p>
-                            <h3 class="text-2xl font-bold text-gray-800 mt-1">${assignedItems}</h3>
+                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1">${assignedItems}</h3>
                         </div>
-                        <div class="p-3 bg-indigo-50 text-indigo-600 rounded-lg"><i data-lucide="map-pin" class="w-6 h-6"></i></div>
+                        <div class="self-end p-2 bg-indigo-50 text-indigo-600 rounded-lg mt-2"><i data-lucide="map-pin" class="w-5 h-5"></i></div>
                     </div>
-                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                    <div class="bg-white p-4 md:p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-full">
                         <div>
                             <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">In Storage</p>
-                            <h3 class="text-2xl font-bold text-gray-800 mt-1">${unassignedItems}</h3>
+                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1">${unassignedItems}</h3>
                         </div>
-                        <div class="p-3 bg-orange-50 text-orange-600 rounded-lg"><i data-lucide="box" class="w-6 h-6"></i></div>
+                        <div class="self-end p-2 bg-orange-50 text-orange-600 rounded-lg mt-2"><i data-lucide="box" class="w-5 h-5"></i></div>
                     </div>
-                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                    <div class="bg-white p-4 md:p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-full">
                         <div>
-                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Pullout / Disposed</p>
-                            <h3 class="text-2xl font-bold text-gray-800 mt-1">${disposedItems}</h3>
+                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Disposed</p>
+                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1">${disposedItems}</h3>
                         </div>
-                        <div class="p-3 bg-red-50 text-red-600 rounded-lg"><i data-lucide="trash-2" class="w-6 h-6"></i></div>
+                        <div class="self-end p-2 bg-red-50 text-red-600 rounded-lg mt-2"><i data-lucide="trash-2" class="w-5 h-5"></i></div>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
                         <h3 class="font-bold text-gray-800 mb-4">Room Occupancy</h3>
-                        <div class="grid grid-cols-3 gap-4 text-center">
-                            <div class="p-4 bg-green-50 rounded-lg border border-green-100">
-                                <span class="block text-2xl font-bold text-green-700">${vacantRooms}</span>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+                            <div class="p-3 bg-green-50 rounded-lg border border-green-100 flex items-center justify-between sm:block px-6 sm:px-3">
+                                <span class="block text-xl font-bold text-green-700">${vacantRooms}</span>
                                 <span class="text-xs font-medium text-green-600 uppercase">Vacant</span>
                             </div>
-                            <div class="p-4 bg-red-50 rounded-lg border border-red-100">
-                                <span class="block text-2xl font-bold text-red-700">${occupiedRooms}</span>
+                            <div class="p-3 bg-red-50 rounded-lg border border-red-100 flex items-center justify-between sm:block px-6 sm:px-3">
+                                <span class="block text-xl font-bold text-red-700">${occupiedRooms}</span>
                                 <span class="text-xs font-medium text-red-600 uppercase">Occupied</span>
                             </div>
-                            <div class="p-4 bg-yellow-50 rounded-lg border border-yellow-100">
-                                <span class="block text-2xl font-bold text-yellow-700">${maintenanceRooms}</span>
+                            <div class="p-3 bg-yellow-50 rounded-lg border border-yellow-100 flex items-center justify-between sm:block px-6 sm:px-3">
+                                <span class="block text-xl font-bold text-yellow-700">${maintenanceRooms}</span>
                                 <span class="text-xs font-medium text-yellow-600 uppercase">Maintenance</span>
                             </div>
                         </div>
@@ -859,55 +855,169 @@
             `;
         }
 
-        // ... [Include generateFloorsView, generateBoxesView, generateActivityLogView, generateSettingsView as they were] ...
         function generateFloorsView() { const floors = state.locations.filter(l => l.type === 'floor').sort((a, b) => a.name.localeCompare(b.name)); const header = `<div class="flex justify-between items-center"><div><h2 class="text-2xl font-bold text-gray-800">Floors</h2><p class="text-sm text-gray-500">Building layout</p></div><button onclick="app.openAddLocationModal('floor')" class="bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow hover:bg-indigo-700 transition"><i data-lucide="plus" class="w-4 h-4"></i> Add Floor</button></div>`; let content = ''; if (floors.length === 0) { content = `<div class="text-center py-20 bg-white rounded-xl border border-dashed border-gray-300 mt-6"><i data-lucide="layers" class="w-12 h-12 text-gray-300 mx-auto mb-3"></i><p class="text-gray-500 font-medium">No floors yet.</p></div>`; } else { content = floors.map(floor => { const rooms = state.locations.filter(l => l.type === 'room' && l.parentId === floor.id); rooms.sort((a, b) => (a.customId || a.name).localeCompare((b.customId || b.name), undefined, { numeric: true, sensitivity: 'base' })); const roomCards = rooms.length === 0 ? `<p class="text-sm text-gray-400 italic col-span-full py-4 text-center">No rooms here.</p>` : rooms.map(room => generateLocationCard(room, 'home', 'text-indigo-600', 'bg-white', 'border-indigo-100')).join(''); return `<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6 mt-6"><div class="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center"><h3 class="font-bold text-gray-800 flex items-center gap-2 text-lg"><i data-lucide="layers" class="w-5 h-5 text-indigo-500"></i> ${floor.name} <button onclick="app.openEditLocationModal('${floor.id}')" class="text-gray-400 hover:text-blue-600 p-1 rounded-full transition"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button></h3><button onclick="app.openAddLocationModal('room', '${floor.id}')" class="text-xs bg-white border border-gray-300 px-3 py-1.5 rounded-md text-gray-700 font-medium hover:bg-gray-50 transition shadow-sm">+ Add Room</button></div><div class="p-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">${roomCards}</div></div>`; }).join(''); } return `<div class="space-y-6 max-w-7xl mx-auto fade-in">${header}${content}</div>`; }
         function generateBoxesView() { const boxes = state.locations.filter(l => l.type === 'box'); boxes.sort((a, b) => (a.customId || a.name).localeCompare((b.customId || b.name), undefined, { numeric: true, sensitivity: 'base' })); const header = `<div class="flex justify-between items-center"><div><h2 class="text-2xl font-bold text-gray-800">Boxes</h2><p class="text-sm text-gray-500">Movable containers</p></div><button onclick="app.openAddLocationModal('box')" class="bg-orange-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow hover:bg-orange-700 transition"><i data-lucide="plus" class="w-4 h-4"></i> Add Box</button></div>`; let content = ''; if (boxes.length === 0) { content = `<div class="text-center py-20 bg-white rounded-xl border border-dashed border-gray-300 mt-6"><i data-lucide="box" class="w-12 h-12 text-gray-300 mx-auto mb-3"></i><p class="text-gray-500 font-medium">No boxes yet.</p></div>`; } else { content = `<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-6">${boxes.map(box => generateLocationCard(box, 'box', 'text-orange-600', 'bg-white', 'border-orange-100')).join('')}</div>`; } return `<div class="space-y-6 max-w-7xl mx-auto fade-in">${header}${content}</div>`; }
         function generateActivityLogView() { const logs = state.logs || []; if (logs.length === 0) { return `<div class="flex flex-col items-center justify-center py-20 text-gray-400"><i data-lucide="clipboard-list" class="w-16 h-16 mb-4 opacity-20"></i><p>No activity recorded yet.</p></div>`; } return `<div class="space-y-4 fade-in max-w-7xl mx-auto"><h2 class="text-2xl font-bold text-gray-800">Activity Log</h2><div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"><div class="divide-y divide-gray-100">${logs.map(log => { const date = formatDatePH(log.timestamp); let icon = 'info'; let colorClass = 'text-gray-500 bg-gray-100'; if (log.action.includes('Added')) { icon = 'plus-circle'; colorClass = 'text-green-600 bg-green-50'; } else if (log.action.includes('Deleted')) { icon = 'trash-2'; colorClass = 'text-red-600 bg-red-50'; } else if (log.action.includes('Moved')) { icon = 'arrow-right-left'; colorClass = 'text-blue-600 bg-blue-50'; } else if (log.action.includes('Renamed')) { icon = 'edit-2'; colorClass = 'text-orange-600 bg-orange-50'; } else if (log.action.includes('Swap')) { icon = 'refresh-cw'; colorClass = 'text-purple-600 bg-purple-50'; } const userLabel = log.user ? `<span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded ml-2 uppercase tracking-wide border border-blue-100">${window.esc(log.user.split('@')[0])}</span>` : ''; return `<div class="p-4 flex gap-4 hover:bg-gray-50 transition"><div class="mt-1"><div class="p-2 rounded-full ${colorClass}"><i data-lucide="${icon}" class="w-4 h-4"></i></div></div><div class="flex-1"><div class="flex justify-between items-start"><h4 class="font-bold text-sm text-gray-900 flex items-center">${log.action} ${userLabel}</h4><span class="text-xs text-gray-400 whitespace-nowrap ml-2">${date}</span></div><p class="text-sm text-gray-600 mt-1 whitespace-pre-line">${log.details}</p></div></div>`; }).join('')}</div></div></div>`; }
-        function generateSettingsView() { 
-            return `<div class="max-w-5xl mx-auto space-y-6 fade-in pb-10">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200 pb-4 gap-4">
-                    <div>
-                        <h2 class="text-2xl font-bold text-gray-800">System Settings</h2>
-                        <p class="text-sm text-gray-500">Manage categories, locations, and reports</p>
-                    </div>
-                    <div class="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-                        <button onclick="app.setSettingsTab('categories')" class="px-4 py-2 rounded-md text-sm font-medium transition ${state.settingsTab === 'categories' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">Categories</button>
-                        <button onclick="app.setSettingsTab('locations')" class="px-4 py-2 rounded-md text-sm font-medium transition ${state.settingsTab === 'locations' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">Locations</button>
-                        <button onclick="app.setSettingsTab('reports')" class="px-4 py-2 rounded-md text-sm font-medium transition ${state.settingsTab === 'reports' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">Reports</button>
-                    </div>
-                </div>
-
-                ${state.settingsTab === 'categories' ? generateCategorySettings() : 
-                  state.settingsTab === 'locations' ? generateLocationSettings() : 
-                  generateReportSettings()}
-                
-                <div class="mt-8 border-t border-gray-200 pt-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div class="flex items-center gap-3">
-                        <div class="bg-gray-100 p-3 rounded-full"><i data-lucide="user" class="w-6 h-6 text-gray-600"></i></div>
-                        <div>
-                            <p class="font-bold text-gray-900">${state.user ? (state.user.displayName || 'User') : 'Guest'}</p>
-                            <p class="text-xs text-gray-500">${state.user ? state.user.email : 'No email'}</p>
-                        </div>
-                    </div>
-                    <div class="flex gap-3 w-full sm:w-auto">
-                        <button onclick="app.openEditProfileModal()" class="flex-1 sm:flex-none px-6 py-3 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition shadow-sm flex items-center justify-center gap-2">
-                            <i data-lucide="edit-3" class="w-4 h-4"></i> Edit Profile
-                        </button>
-                        <button onclick="app.handleLogout()" class="flex-1 sm:flex-none px-6 py-3 bg-red-50 text-red-600 hover:bg-red-100 font-bold rounded-xl transition flex items-center justify-center gap-2">
-                            <i data-lucide="log-out" class="w-4 h-4"></i> Log Out
-                        </button>
-                    </div>
-                </div>
-            </div>`; 
-        }
+        function generateSettingsView() { return `<div class="max-w-5xl mx-auto space-y-6 fade-in pb-10"><div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200 pb-4 gap-4"><div><h2 class="text-2xl font-bold text-gray-800">System Settings</h2><p class="text-sm text-gray-500">Manage categories, locations, and reports</p></div><div class="flex space-x-1 bg-gray-100 p-1 rounded-lg"><button onclick="app.setSettingsTab('categories')" class="px-4 py-2 rounded-md text-sm font-medium transition ${state.settingsTab === 'categories' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">Categories</button><button onclick="app.setSettingsTab('locations')" class="px-4 py-2 rounded-md text-sm font-medium transition ${state.settingsTab === 'locations' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">Locations</button><button onclick="app.setSettingsTab('reports')" class="px-4 py-2 rounded-md text-sm font-medium transition ${state.settingsTab === 'reports' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">Reports</button></div></div>${state.settingsTab === 'categories' ? generateCategorySettings() : state.settingsTab === 'locations' ? generateLocationSettings() : generateReportSettings()}<div class="mt-8 border-t border-gray-200 pt-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"><div class="flex items-center gap-3"><div class="bg-gray-100 p-3 rounded-full"><i data-lucide="user" class="w-6 h-6 text-gray-600"></i></div><div><p class="font-bold text-gray-900">${state.user ? (state.user.displayName || 'User') : 'Guest'}</p><p class="text-xs text-gray-500">${state.user ? state.user.email : 'No email'}</p></div></div><div class="flex gap-3 w-full sm:w-auto"><button onclick="app.openEditProfileModal()" class="flex-1 sm:flex-none px-6 py-3 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition shadow-sm flex items-center justify-center gap-2"><i data-lucide="edit-3" class="w-4 h-4"></i> Edit Profile</button><button onclick="app.handleLogout()" class="flex-1 sm:flex-none px-6 py-3 bg-red-50 text-red-600 hover:bg-red-100 font-bold rounded-xl transition flex items-center justify-center gap-2"><i data-lucide="log-out" class="w-4 h-4"></i> Log Out</button></div></div></div>`; }
         function generateReportSettings() { return `<div class="grid grid-cols-1 md:grid-cols-2 gap-8"><div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm"><div class="flex items-center gap-3 mb-4"><div class="bg-red-100 p-2.5 rounded-lg text-red-600"><i data-lucide="file-text" class="w-6 h-6"></i></div><div><h3 class="text-lg font-bold text-gray-800">Generate PDF Report</h3><p class="text-sm text-gray-500">Select content to include</p></div></div><div class="space-y-4 mb-8"><label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition"><input type="checkbox" id="report-summary" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"><div><span class="font-bold text-gray-700 text-sm block">Executive Summary</span><span class="text-xs text-gray-400">Stats and charts</span></div></label><label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition"><input type="checkbox" id="report-inventory" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"><div><span class="font-bold text-gray-700 text-sm block">Full Inventory List</span><span class="text-xs text-gray-400">Active items</span></div></label><label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition"><input type="checkbox" id="report-locations" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"><div><span class="font-bold text-gray-700 text-sm block">Location Status</span><span class="text-xs text-gray-400">Room details</span></div></label><label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition"><input type="checkbox" id="report-logs" class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"><div><span class="font-bold text-gray-700 text-sm block">Activity Logs</span><span class="text-xs text-gray-400">Recent actions</span></div></label></div><button onclick="app.generatePDF()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg shadow-blue-200 transition flex items-center justify-center gap-2"><i data-lucide="download" class="w-5 h-5"></i> Download PDF Report</button></div><div class="bg-blue-50 border border-blue-100 rounded-xl p-6 flex flex-col justify-center items-center text-center"><img src="https://illustrations.popsy.co/amber/success.svg" class="w-48 h-48 mb-6 opacity-80" alt="Report"><h3 class="text-xl font-bold text-blue-900 mb-2">Professional Reporting</h3><p class="text-sm text-blue-700 max-w-xs">Generate clean, branded PDF reports for audits and reviews.</p></div></div>`; }
         
-        // --- UPDATED generateCategorySettings ---
-        // Added: opacity-100 md:opacity-0 md:group-hover/sub:opacity-100 for better mobile visibility
-        // Removed: 'delete' button opacity transition on mobile to make it always accessible if needed
         function generateCategorySettings() { const categories = state.masterData.categories || []; if (categories.length === 0) return `<div class="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300"><p class="text-gray-500 mb-4">No categories defined.</p><button onclick="app.openManageCategoryModal('add')" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">Create First Category</button></div>`; return `<div class="grid grid-cols-1 gap-6"><div class="flex justify-between items-center"><h3 class="text-lg font-bold text-gray-800">All Categories</h3><button onclick="app.openManageCategoryModal('add')" class="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow hover:bg-blue-700 transition"><i data-lucide="plus" class="w-4 h-4"></i> New Category</button></div><div class="space-y-4">${categories.map(cat => `<div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm"><div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center group"><div class="font-bold text-gray-800 flex items-center gap-2"><i data-lucide="folder" class="w-4 h-4 text-blue-500"></i> ${cat.name}</div><div class="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition"><button onclick="app.openManageCategoryModal('rename', '${window.esc(cat.name)}')" class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-white rounded-md transition" title="Rename"><i data-lucide="pencil" class="w-4 h-4"></i></button><button onclick="app.deleteMasterCategory('${window.esc(cat.name)}')" class="p-1.5 text-gray-500 hover:text-red-600 hover:bg-white rounded-md transition" title="Delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div></div><div class="p-4"><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">${cat.subs && cat.subs.length > 0 ? cat.subs.map(sub => `<div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100 group/sub hover:border-blue-200 transition"><span class="text-sm font-medium text-gray-700">${sub}</span><div class="flex gap-1 opacity-100 md:opacity-0 md:group-hover/sub:opacity-100 transition"><button onclick="app.openMoveSubCategoryModal('${window.esc(sub)}', '${window.esc(cat.name)}')" class="p-1 text-gray-400 hover:text-orange-600" title="Move"><i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i></button><button onclick="app.openManageSubCategoryModal('rename', '${window.esc(cat.name)}', '${window.esc(sub)}')" class="p-1 text-gray-400 hover:text-blue-600" title="Rename"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button><button onclick="app.deleteMasterSubCategory('${window.esc(cat.name)}', '${window.esc(sub)}')" class="p-1 text-gray-400 hover:text-red-600" title="Delete"><i data-lucide="x" class="w-3.5 h-3.5"></i></button></div></div>`).join('') : '<span class="text-sm text-gray-400 italic">No sub-categories</span>'}<button onclick="app.openManageSubCategoryModal('add', '${window.esc(cat.name)}')" class="flex items-center justify-center gap-2 p-3 border border-dashed border-gray-300 rounded-lg text-gray-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition text-sm font-medium"><i data-lucide="plus" class="w-4 h-4"></i> Add Sub-Category</button></div></div></div>`).join('')}</div></div>`; }
         function generateLocationSettings() { const floors = state.locations.filter(l => l.type === 'floor').sort((a,b) => a.name.localeCompare(b.name)); const boxes = state.locations.filter(l => l.type === 'box').sort((a,b) => a.name.localeCompare(b.name)); return `<div class="grid grid-cols-1 lg:grid-cols-2 gap-8"><div class="space-y-4"><div class="flex justify-between items-center"><h3 class="text-lg font-bold text-gray-800">Floors & Rooms</h3><button onclick="app.openAddLocationModal('floor')" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100 transition">+ Add Floor</button></div><div class="space-y-4">${floors.map(floor => { const rooms = state.locations.filter(l => l.parentId === floor.id).sort((a,b) => a.name.localeCompare(b.name)); return `<div class="bg-white border border-gray-200 rounded-lg overflow-hidden"><div class="bg-gray-50 px-3 py-2 border-b border-gray-200 flex justify-between items-center"><span class="font-bold text-gray-800 text-sm flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4 text-indigo-500"></i> ${floor.name}</span><div class="flex gap-1"><button onclick="app.openAddLocationModal('room', '${floor.id}')" class="text-xs bg-white border border-gray-300 px-2 py-0.5 rounded text-gray-600 hover:bg-gray-50">+ Room</button><button onclick="app.openEditLocationModal('${floor.id}')" class="text-gray-400 hover:text-blue-600 p-1"><i data-lucide="settings-2" class="w-3.5 h-3.5"></i></button></div></div><div class="p-2 space-y-1">${rooms.length > 0 ? rooms.map(room => `<div class="flex justify-between items-center p-2 rounded hover:bg-gray-50 group"><div class="flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full ${room.status === 'occupied' ? 'bg-red-500' : (room.status === 'maintenance' ? 'bg-yellow-500' : 'bg-green-500')}"></div><span class="text-sm text-gray-700">${room.name}</span><span class="text-[10px] text-gray-400 font-mono border px-1 rounded">${room.customId || 'N/A'}</span></div><button onclick="app.openEditLocationModal('${room.id}')" class="text-gray-300 hover:text-blue-600 p-1 opacity-0 group-hover:opacity-100 transition"><i data-lucide="pencil" class="w-3 h-3"></i></button></div>`).join('') : '<div class="p-2 text-xs text-gray-400 italic text-center">No rooms</div>'}</div></div>`; }).join('')}</div></div><div class="space-y-4"><div class="flex justify-between items-center"><h3 class="text-lg font-bold text-gray-800">Boxes & Containers</h3><button onclick="app.openAddLocationModal('box')" class="px-3 py-1.5 bg-orange-50 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-100 transition">+ Add Box</button></div><div class="bg-white border border-gray-200 rounded-xl p-4">${boxes.length > 0 ? `<div class="grid grid-cols-2 gap-3">${boxes.map(box => `<div class="flex justify-between items-center p-2 border border-gray-100 rounded-lg hover:border-orange-200 group"><div class="flex items-center gap-2"><i data-lucide="box" class="w-4 h-4 text-orange-500"></i><span class="text-sm font-medium text-gray-700 truncate">${box.name}</span></div><button onclick="app.openEditLocationModal('${box.id}')" class="text-gray-300 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button></div>`).join('')}</div>` : '<div class="text-center py-8 text-gray-400 italic">No boxes registered.</div>'}</div></div></div>`; }
-        function generateInventoryItems() { const term = state.searchTerm.toLowerCase(); const isDisposalMode = state.storageViewMode === 'disposal'; let filtered = state.inventory.filter(item => { const matchesMode = isDisposalMode ? item.isDisposed : !item.isDisposed; const matchesTerm = item.name.toLowerCase().includes(term) || item.equipmentId.toLowerCase().includes(term) || (item.category && item.category.toLowerCase().includes(term)); return matchesMode && matchesTerm; }); if (filtered.length === 0 && (state.masterData.categories || []).length === 0) { const emptyMsg = isDisposalMode ? "Pullout bin is empty." : "No active items found."; return `<div class="flex flex-col items-center justify-center py-20 text-gray-400"><i data-lucide="${isDisposalMode ? 'trash-2' : 'package-open'}" class="w-16 h-16 mb-4 opacity-20"></i><p>${emptyMsg}</p></div>`; } const grouped = {}; if (!isDisposalMode) { (state.masterData.categories || []).forEach(cat => { grouped[cat.name] = {}; if(cat.subs) { cat.subs.forEach(sub => { grouped[cat.name][sub] = {}; }); } }); } filtered.forEach(item => { const cat = item.category || 'Uncategorized'; const sub = item.subCategory || 'General'; const name = item.name || 'Unnamed'; if (!grouped[cat]) grouped[cat] = {}; if (!grouped[cat][sub]) grouped[cat][sub] = {}; if (!grouped[cat][sub][name]) grouped[cat][sub][name] = []; grouped[cat][sub][name].push(item); }); let html = ''; Object.keys(grouped).sort().forEach(cat => { const subKeys = Object.keys(grouped[cat]).sort(); html += `<div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm mb-4">`; html += `<div class="bg-gray-50 px-4 py-3 border-b border-gray-200 font-bold text-gray-700 flex items-center gap-2"><div class="flex items-center gap-2 flex-1"><i data-lucide="folder" class="w-4 h-4 text-blue-500"></i> ${cat}</div>${!isDisposalMode ? `<div class="flex gap-1"><button onclick="app.openRenameModal('category', '${window.esc(cat)}')" class="text-gray-300 hover:text-blue-500 p-1 rounded transition" title="Rename"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button></div>` : ''}</div>`; html += `<div class="p-4 space-y-4">`; if (subKeys.length === 0) { html += `<div class="text-xs text-gray-400 italic">No sub-categories defined.</div>`; } subKeys.forEach(sub => { const itemNames = Object.keys(grouped[cat][sub]).sort(); html += `<div class="space-y-3">`; html += `<h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 group/sub"><span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span> ${sub}${!isDisposalMode ? `<button onclick="app.openAddItemModal({category: '${window.esc(cat)}', subCategory: '${window.esc(sub)}'})" class="text-gray-300 hover:text-blue-600 p-1 rounded transition opacity-0 group-hover/sub:opacity-100" title="Add New Item to ${sub}"><i data-lucide="plus-circle" class="w-3.5 h-3.5"></i></button><button onclick="app.openRenameModal('subCategory', '${window.esc(sub)}', '${window.esc(cat)}')" class="text-gray-300 hover:text-blue-500 p-1 rounded transition opacity-0 group-hover/sub:opacity-100" title="Rename"><i data-lucide="pencil" class="w-3 h-3"></i></button>` : ''}</h4>`; if (itemNames.length === 0) { html += `<div class="text-xs text-gray-300 italic pl-4 py-2 border border-dashed border-gray-200 rounded">No items in this category yet.</div>`; } else { html += `<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">`; itemNames.forEach(name => { const items = grouped[cat][sub][name]; items.sort((a,b) => a.equipmentId.localeCompare(b.equipmentId, undefined, {numeric: true})); const stockCount = items.filter(i => !i.locationId).length; const totalCount = items.length; const hasStock = stockCount > 0; const cardBg = hasStock || isDisposalMode ? "bg-white" : "bg-gray-50 opacity-90"; const badgeColor = hasStock ? "bg-blue-100 text-blue-700" : (isDisposalMode ? "bg-red-100 text-red-700" : "bg-gray-200 text-gray-600"); const badgeText = isDisposalMode ? `${totalCount} Pulled Out` : (hasStock ? `${stockCount} In Stock` : `No Stock (0/${totalCount})`); let itemsListHtml = ''; const itemsToShow = items; if (itemsToShow.length > 0) { itemsListHtml = itemsToShow.map((i, index) => { const statusColor = i.condition === 'Defective' ? 'bg-red-500' : 'bg-green-500'; const isLastItem = index === itemsToShow.length - 1; let actionButtons = ''; if (!isDisposalMode) { actionButtons = `<button onclick="app.openMoveItemModal('${i.id}')" class="text-gray-400 hover:text-blue-600 p-1" title="Move Location"><i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i></button>${isLastItem ? `<button onclick="app.deleteItem('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', false)" class="text-gray-300 hover:text-red-500 p-1" title="Delete (Reuse ID)"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : '<span class="w-5.5 inline-block"></span>'}`; } else { actionButtons = `<button onclick="app.toggleDisposal('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', true)" class="text-green-600 hover:text-green-800 p-1" title="Restore to Inventory"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i></button><button onclick="app.deleteItem('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', true)" class="text-red-400 hover:text-red-700 p-1" title="Delete Permanently"><i data-lucide="x-circle" class="w-3.5 h-3.5"></i></button>`; } return `<div class="flex justify-between items-center text-xs p-2 bg-gray-50 rounded border border-gray-100 hover:border-blue-200 transition group/item"><div class="flex items-center gap-2 flex-1 min-w-0"><button onclick="app.toggleCondition('${i.id}', '${i.condition || 'Working'}')" class="w-2.5 h-2.5 rounded-full ${statusColor} hover:scale-125 transition flex-none" title="${i.condition || 'Working'} (Click to toggle)"></button><span class="font-mono font-bold text-blue-600 flex-none">${i.equipmentId}</span>${!isDisposalMode ? `<div class="truncate pl-2 text-[10px] text-right flex-1">${getLocationName(i.locationId)}</div>` : ''}</div><div class="flex gap-1 pl-2 transition">${actionButtons}</div></div>`}).join(''); } else { itemsListHtml = `<div class="text-xs text-gray-400 italic text-center py-2">No items listed</div>`; } html += `<div class="${cardBg} border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 flex flex-col h-full relative group/card"><div class="flex justify-between items-start mb-3 pb-2 border-b border-gray-100"><div><h3 class="font-bold text-gray-900 text-sm leading-tight pr-2 flex items-center gap-1">${name}${!isDisposalMode ? `<button onclick="app.openEditItemNameModal('${items[0].id}')" class="text-gray-300 hover:text-blue-600 ml-1 inline-block"><i data-lucide="pencil" class="w-3 h-3"></i></button>` : ''}</h3><span class="${badgeColor} text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1">${badgeText}</span></div>${!isDisposalMode ? `<button onclick="app.openAddStockModal('${window.esc(cat)}', '${window.esc(sub)}', '${window.esc(name)}')" class="text-blue-600 hover:bg-blue-50 p-1 rounded-full transition" title="Add Stock"><i data-lucide="plus-circle" class="w-5 h-5"></i></button>` : ''}</div><div class="flex-1 overflow-y-auto max-h-48 space-y-1 custom-scrollbar pr-1">${itemsListHtml}</div></div>`; }); html += `</div>`; } html += `</div>`; }); html += `</div></div>`; }); return html; }
+        function generateInventoryItems() {
+            const term = state.searchTerm.toLowerCase();
+            const isDisposalMode = state.storageViewMode === 'disposal';
+            
+            let filtered = state.inventory.filter(item => {
+                const matchesMode = isDisposalMode ? item.isDisposed : !item.isDisposed;
+                const matchesTerm = item.name.toLowerCase().includes(term) ||
+                    item.equipmentId.toLowerCase().includes(term) ||
+                    (item.category && item.category.toLowerCase().includes(term));
+                return matchesMode && matchesTerm;
+            });
+
+            if (filtered.length === 0 && (state.masterData.categories || []).length === 0) {
+                const emptyMsg = isDisposalMode ? "Pullout bin is empty." : "No active items found.";
+                return `<div class="flex flex-col items-center justify-center py-20 text-gray-400"><i data-lucide="${isDisposalMode ? 'trash-2' : 'package-open'}" class="w-16 h-16 mb-4 opacity-20"></i><p>${emptyMsg}</p></div>`;
+            }
+
+            // --- Structure Building Logic (Modified to include empty Master Data categories) ---
+            const grouped = {};
+
+            // 1. Initialize structure from Master Data (if Active mode)
+            if (!isDisposalMode) {
+                (state.masterData.categories || []).forEach(cat => {
+                    grouped[cat.name] = {};
+                    if(cat.subs) {
+                        cat.subs.forEach(sub => {
+                            grouped[cat.name][sub] = {};
+                        });
+                    }
+                });
+            }
+
+            // 2. Populate with actual inventory items
+            filtered.forEach(item => {
+                const cat = item.category || 'Uncategorized';
+                const sub = item.subCategory || 'General';
+                const name = item.name || 'Unnamed';
+                
+                if (!grouped[cat]) grouped[cat] = {};
+                if (!grouped[cat][sub]) grouped[cat][sub] = {};
+                if (!grouped[cat][sub][name]) grouped[cat][sub][name] = [];
+                grouped[cat][sub][name].push(item);
+            });
+
+            let html = '';
+            
+            Object.keys(grouped).sort().forEach(cat => {
+                const subKeys = Object.keys(grouped[cat]).sort();
+                html += `<div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm mb-4">`;
+                html += `<div class="bg-gray-50 px-4 py-3 border-b border-gray-200 font-bold text-gray-700 flex items-center gap-2"><div class="flex items-center gap-2 flex-1"><i data-lucide="folder" class="w-4 h-4 text-blue-500"></i> ${cat}</div>${!isDisposalMode ? `<div class="flex gap-1"><button onclick="app.openRenameModal('category', '${window.esc(cat)}')" class="text-gray-300 hover:text-blue-500 p-1 rounded transition" title="Rename"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button></div>` : ''}</div>`;
+                html += `<div class="p-4 space-y-4">`;
+                
+                if (subKeys.length === 0) {
+                     html += `<div class="text-xs text-gray-400 italic">No sub-categories defined.</div>`;
+                }
+
+                subKeys.forEach(sub => {
+                    const itemNames = Object.keys(grouped[cat][sub]).sort();
+                    
+                    html += `<div class="space-y-3">`;
+                    html += `<h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 group/sub"><span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span> ${sub}${!isDisposalMode ? `<button onclick="app.openAddItemModal({category: '${window.esc(cat)}', subCategory: '${window.esc(sub)}'})" class="text-gray-300 hover:text-blue-600 p-1 rounded transition opacity-0 group-hover/sub:opacity-100" title="Add New Item to ${sub}"><i data-lucide="plus-circle" class="w-3.5 h-3.5"></i></button><button onclick="app.openRenameModal('subCategory', '${window.esc(sub)}', '${window.esc(cat)}')" class="text-gray-300 hover:text-blue-500 p-1 rounded transition opacity-0 group-hover/sub:opacity-100" title="Rename"><i data-lucide="pencil" class="w-3 h-3"></i></button>` : ''}</h4>`;
+                    
+                    if (itemNames.length === 0) {
+                        html += `<div class="text-xs text-gray-300 italic pl-4 py-2 border border-dashed border-gray-200 rounded">No items in this category yet.</div>`;
+                    } else {
+                        html += `<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">`;
+                        
+                        itemNames.forEach(name => {
+                            const items = grouped[cat][sub][name];
+                            items.sort((a,b) => a.equipmentId.localeCompare(b.equipmentId, undefined, {numeric: true}));
+                            
+                            const stockCount = items.filter(i => !i.locationId).length;
+                            const totalCount = items.length;
+                            const hasStock = stockCount > 0;
+                            
+                            const cardBg = hasStock || isDisposalMode ? "bg-white" : "bg-gray-50 opacity-90";
+                            const badgeColor = hasStock ? "bg-blue-100 text-blue-700" : (isDisposalMode ? "bg-red-100 text-red-700" : "bg-gray-200 text-gray-600");
+                            const badgeText = isDisposalMode ? `${totalCount} Pulled Out` : (hasStock ? `${stockCount} In Stock` : `No Stock (0/${totalCount})`);
+
+                            let itemsListHtml = '';
+                            
+                            // UPDATED LOGIC: Filter items based on assignment status
+                            let itemsToShow = items;
+                            if (!isDisposalMode) {
+                                // Only show unassigned items in active mode
+                                itemsToShow = items.filter(i => !i.locationId);
+                            }
+
+                            if (itemsToShow.length > 0) {
+                                itemsListHtml = itemsToShow.map((i, index) => {
+                                    const statusColor = i.condition === 'Defective' ? 'bg-red-500' : 'bg-green-500';
+                                    const isLastItem = index === itemsToShow.length - 1;
+
+                                    let actionButtons = '';
+                                    if (!isDisposalMode) {
+                                        actionButtons = `
+                                            <button onclick="app.openMoveItemModal('${i.id}')" class="text-gray-400 hover:text-blue-600 p-1" title="Move Location">
+                                                <i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i>
+                                            </button>
+                                            ${isLastItem ? `
+                                            <button onclick="app.deleteItem('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', false)" class="text-gray-300 hover:text-red-500 p-1" title="Delete (Reuse ID)">
+                                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                            </button>` : '<span class="w-5.5 inline-block"></span>'} 
+                                            `;
+                                    } else {
+                                        actionButtons = `
+                                            <button onclick="app.toggleDisposal('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', true)" class="text-green-600 hover:text-green-800 p-1" title="Restore to Inventory">
+                                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                                            </button>
+                                            <button onclick="app.deleteItem('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', true)" class="text-red-400 hover:text-red-700 p-1" title="Delete Permanently">
+                                                <i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
+                                            </button>`;
+                                    }
+
+                                    return `
+                                    <div class="flex justify-between items-center text-xs p-2 bg-gray-50 rounded border border-gray-100 hover:border-blue-200 transition group/item">
+                                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                                            <button onclick="app.toggleCondition('${i.id}', '${i.condition || 'Working'}')" class="w-2.5 h-2.5 rounded-full ${statusColor} hover:scale-125 transition flex-none" title="${i.condition || 'Working'} (Click to toggle)"></button>
+                                            <span class="font-mono font-bold text-blue-600 flex-none">${i.equipmentId}</span>
+                                            ${!isDisposalMode ? `<div class="truncate pl-2 text-[10px] text-right flex-1 text-gray-400 italic">In Storage</div>` : ''}
+                                        </div>
+                                        <div class="flex gap-1 pl-2 transition">
+                                            ${actionButtons}
+                                        </div>
+                                    </div>
+                                `}).join('');
+                            } else {
+                                // Show "No stock" message if list is empty but card exists
+                                const msg = isDisposalMode ? "No items" : "No stock available";
+                                itemsListHtml = `<div class="text-[10px] text-gray-400 italic text-center py-4 bg-gray-50 rounded border border-dashed border-gray-200 leading-relaxed">${msg}</div>`;
+                            }
+
+                            html += `
+                            <div class="${cardBg} border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 flex flex-col h-full relative group/card">
+                                <div class="flex justify-between items-start mb-3 pb-2 border-b border-gray-100">
+                                    <div>
+                                        <h3 class="font-bold text-gray-900 text-sm leading-tight pr-2 flex items-center gap-1">
+                                            ${name}
+                                            ${!isDisposalMode ? `<button onclick="app.openEditItemNameModal('${items[0].id}')" class="text-gray-300 hover:text-blue-600 ml-1 inline-block"><i data-lucide="pencil" class="w-3 h-3"></i></button>` : ''}
+                                        </h3>
+                                        <span class="${badgeColor} text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1">${badgeText}</span>
+                                    </div>
+                                    ${!isDisposalMode ? `<button onclick="app.openAddStockModal('${window.esc(cat)}', '${window.esc(sub)}', '${window.esc(name)}')" class="text-blue-600 hover:bg-blue-50 p-1 rounded-full transition" title="Add Stock"><i data-lucide="plus-circle" class="w-5 h-5"></i></button>` : ''}
+                                </div>
+                                <div class="flex-1 overflow-y-auto max-h-48 space-y-1 custom-scrollbar pr-1">${itemsListHtml}</div>
+                            </div>`;
+                        });
+                        html += `</div>`;
+                    }
+                    html += `</div>`;
+                });
+                html += `</div></div>`;
+            });
+            return html;
+        }
 
         // --- Global App Object ---
         window.app = {
@@ -1427,7 +1537,106 @@
                     } 
                 };
                 app.openConfirmModal(`Delete sub-category "${subName}"?`, doDelete);
-            } 
+            },
+
+            // --- PDF GENERATION ---
+            generatePDF: () => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                const now = new Date();
+                const dateStr = formatDatePH(now.toISOString());
+                // Corporate Colors
+                const darkBlue = [26, 54, 93]; 
+                const slateGray = [100, 116, 139];
+                const lightGray = [241, 245, 249];
+                // --- HEADER ---
+                doc.setFillColor(...darkBlue);
+                doc.rect(0, 0, 210, 40, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(24);
+                doc.setFont('helvetica', 'bold');
+                doc.text("INVENTORY REPORT", 14, 25);
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`Generated: ${dateStr}`, 14, 33);
+                let yPos = 55;
+                // --- SELECTIONS ---
+                const includeSummary = document.getElementById('report-summary').checked;
+                const includeInventory = document.getElementById('report-inventory').checked;
+                const includeLocations = document.getElementById('report-locations').checked;
+                const includeLogs = document.getElementById('report-logs').checked;
+                // --- 1. EXECUTIVE SUMMARY ---
+                if (includeSummary) {
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text("EXECUTIVE SUMMARY", 14, yPos);
+                    doc.setDrawColor(...slateGray);
+                    doc.line(14, yPos + 2, 196, yPos + 2);
+                    yPos += 15;
+                    // Metrics
+                    const totalItems = state.inventory.filter(i => !i.isDisposed).length;
+                    const assigned = state.inventory.filter(i => !i.isDisposed && i.locationId).length;
+                    const storage = totalItems - assigned;
+                    const disposed = state.inventory.filter(i => i.isDisposed).length;
+                    const rooms = state.locations.filter(l => l.type === 'room');
+                    const vacant = rooms.filter(r => r.status === 'vacant').length;
+                    const occupied = rooms.filter(r => r.status === 'occupied').length;
+                    const maintenance = rooms.filter(r => r.status === 'maintenance').length;
+                    const subCounts = {};
+                    state.inventory.filter(i => !i.isDisposed).forEach(i => {
+                        const sub = i.subCategory || 'General';
+                        subCounts[sub] = (subCounts[sub] || 0) + 1;
+                    });
+                    const topSubs = Object.entries(subCounts).sort((a,b) => b[1] - a[1]).slice(0, 5).map(([k,v]) => `${k}: ${v}`).join(', ');
+                    const summaryData = [['Total Active Assets', totalItems, 'Vacant Rooms', vacant],['In Storage', storage, 'Occupied Rooms', occupied],['Assigned / Deployed', assigned, 'Under Maintenance', maintenance],['Disposed / Retired', disposed, 'Top Categories', topSubs]];
+                    doc.autoTable({ startY: yPos, body: summaryData, theme: 'grid', styles: { fontSize: 9, cellPadding: 4, lineColor: [200, 200, 200] }, columnStyles: { 0: { fontStyle: 'bold', fillColor: lightGray, cellWidth: 40 }, 2: { fontStyle: 'bold', fillColor: lightGray, cellWidth: 40 } }, margin: { left: 14, right: 14 } });
+                    yPos = doc.lastAutoTable.finalY + 20;
+                }
+                // --- 2. FULL INVENTORY (Grouped) ---
+                if (includeInventory) {
+                    if (yPos > 240) { doc.addPage(); yPos = 20; }
+                    doc.setTextColor(0, 0, 0); doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.text("FULL INVENTORY LIST", 14, yPos); doc.line(14, yPos + 2, 196, yPos + 2); yPos += 10;
+                    const grouped = {};
+                    state.inventory.filter(i => !i.isDisposed).forEach(i => { if(!grouped[i.category]) grouped[i.category] = {}; if(!grouped[i.category][i.subCategory]) grouped[i.category][i.subCategory] = []; grouped[i.category][i.subCategory].push(i); });
+                    const tableRows = [];
+                    Object.keys(grouped).sort().forEach(cat => {
+                        tableRows.push([{ content: cat.toUpperCase(), colSpan: 5, styles: { fillColor: [226, 232, 240], fontStyle: 'bold', textColor: [0,0,0] } }]);
+                        Object.keys(grouped[cat]).sort().forEach(sub => {
+                            tableRows.push([{ content: `   ${sub}`, colSpan: 5, styles: { fillColor: [248, 250, 252], fontStyle: 'bold', textColor: [100,100,100] } }]);
+                            const items = grouped[cat][sub].sort((a,b) => a.equipmentId.localeCompare(b.equipmentId, undefined, {numeric: true}));
+                            items.forEach(item => { const locName = item.locationId ? getLocationNamePlain(item.locationId) : 'Storage'; tableRows.push([ item.equipmentId, item.name, locName, item.condition, item.quantity || 1 ]); });
+                        });
+                    });
+                    doc.autoTable({ startY: yPos, head: [['ID', 'Item Name', 'Location', 'Condition', 'Qty']], body: tableRows, theme: 'plain', headStyles: { fillColor: darkBlue, textColor: 255 }, styles: { fontSize: 8, cellPadding: 2 }, columnStyles: { 0: { fontStyle: 'bold', cellWidth: 30 } }, margin: { left: 14, right: 14 } });
+                    yPos = doc.lastAutoTable.finalY + 20;
+                }
+                // --- 3. LOCATION STATUS (Grouped by Floor & Sorted) ---
+                if (includeLocations) {
+                    if (yPos > 250) { doc.addPage(); yPos = 20; }
+                    doc.setTextColor(0, 0, 0); doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.text("LOCATION STATUS REPORT", 14, yPos); doc.line(14, yPos + 2, 196, yPos + 2); yPos += 10;
+                    const floors = state.locations.filter(l => l.type === 'floor').sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+                    const locRows = [];
+                    floors.forEach(floor => {
+                        locRows.push([{ content: floor.name.toUpperCase(), colSpan: 4, styles: { fillColor: [226, 232, 240], fontStyle: 'bold', textColor: [0,0,0] } }]);
+                        const rooms = state.locations.filter(l => l.type === 'room' && l.parentId === floor.id).sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+                        if (rooms.length === 0) { locRows.push([{ content: 'No rooms configured.', colSpan: 4, styles: { fontStyle: 'italic', textColor: [150,150,150] } }]); }
+                        rooms.forEach(l => { const roomItems = state.inventory.filter(i => i.locationId === l.id); const subCounts = {}; roomItems.forEach(i => { const sub = i.subCategory || 'General'; subCounts[sub] = (subCounts[sub] || 0) + 1; }); const assetDetails = Object.keys(subCounts).length > 0 ? Object.entries(subCounts).map(([k,v]) => `${k}: ${v}`).join(', ') : 'Empty'; locRows.push([ l.customId || 'N/A', l.name, l.status ? l.status.toUpperCase() : 'UNKNOWN', assetDetails ]); });
+                    });
+                    doc.autoTable({ startY: yPos, head: [['Room ID', 'Name', 'Status', 'Assets Breakdown']], body: locRows, theme: 'grid', headStyles: { fillColor: darkBlue, textColor: 255 }, styles: { fontSize: 9, cellPadding: 3, valign: 'middle' }, columnStyles: { 3: { fontSize: 8 } }, margin: { left: 14, right: 14 } });
+                    yPos = doc.lastAutoTable.finalY + 20;
+                }
+                // --- 4. ACTIVITY LOGS ---
+                if (includeLogs) {
+                    doc.addPage(); yPos = 20; doc.setTextColor(0, 0, 0); doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.text("SYSTEM ACTIVITY LOGS", 14, yPos); doc.line(14, yPos + 2, 196, yPos + 2); yPos += 10;
+                    const logRows = state.logs.slice(0, 50).map(l => { return [formatDatePH(l.timestamp), l.action, l.details]; });
+                    doc.autoTable({ startY: yPos, head: [['Timestamp', 'Action', 'Details']], body: logRows, theme: 'striped', headStyles: { fillColor: slateGray, textColor: 255 }, styles: { fontSize: 8, cellPadding: 2 }, columnStyles: { 0: { cellWidth: 40 }, 1: { fontStyle: 'bold', cellWidth: 40 } }, margin: { left: 14, right: 14 } });
+                }
+                // --- FOOTER (Page Numbers) ---
+                const pageCount = doc.internal.getNumberOfPages(); for(let i = 1; i <= pageCount; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150); doc.text(`Page ${i} of ${pageCount}`, 196, 285, { align: 'right' }); }
+                doc.save(`Equipment_Report_${now.toISOString().slice(0,10)}.pdf`);
+                showToast("PDF Report Generated");
+            }
         };
 
         // --- Render Helpers ---
