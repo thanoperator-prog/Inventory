@@ -67,12 +67,24 @@
         /* Prevent pull-to-refresh on mobile */
         body { overscroll-behavior-y: none; }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+
+        /* Auth Screen Background */
+        .auth-bg {
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 h-screen flex overflow-hidden">
 
+    <!-- Auth Container (Login Screen) -->
+    <div id="auth-container" class="fixed inset-0 z-50 flex flex-col items-center justify-center p-6 auth-bg hidden">
+        <!-- Content injected by JS -->
+    </div>
+
     <!-- Sidebar (Desktop Only) -->
-    <aside class="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col flex-none z-30 transition-all duration-300">
+    <aside id="app-sidebar" class="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col flex-none z-30 transition-all duration-300">
         <div class="h-16 flex items-center justify-start px-6 border-b border-gray-100 flex-none">
             <div class="bg-blue-600 p-1.5 rounded-lg">
                 <i data-lucide="package" class="w-6 h-6 text-white"></i>
@@ -115,7 +127,7 @@
     </aside>
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col min-w-0 bg-gray-50 h-full relative">
+    <div id="app-main" class="flex-1 flex flex-col min-w-0 bg-gray-50 h-full relative hidden">
         <!-- Header -->
         <header class="bg-white border-b border-gray-200 h-16 px-4 md:px-8 flex items-center justify-between shadow-sm z-20 flex-none sticky top-0">
             <div class="flex items-center">
@@ -124,10 +136,14 @@
                 </div>
                 <div>
                     <h1 id="header-title" class="text-lg md:text-xl font-bold text-gray-800">Overview</h1>
-                    <p class="text-xs text-gray-500 hidden sm:block">Manage your equipment inventory and locations</p>
+                    <p id="header-subtitle" class="text-xs text-gray-500 hidden sm:block">Manage your equipment inventory and locations</p>
                 </div>
             </div>
             <div class="flex items-center gap-3">
+                <div class="text-right hidden sm:block mr-2">
+                    <p id="user-email-display" class="text-xs font-bold text-gray-700">user@example.com</p>
+                    <p class="text-[10px] text-gray-400">Logged in</p>
+                </div>
                 <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full border border-green-200 font-medium flex items-center gap-1">
                     <div class="w-1.5 h-1.5 rounded-full bg-green-500"></div> <span class="hidden sm:inline">Live</span>
                 </span>
@@ -200,15 +216,13 @@
     <!-- Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, writeBatch, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- ICON GENERATION (Blue box with white package) ---
-        // Matches <div class="bg-blue-600 p-1.5 rounded-lg"><i data-lucide="package" class="w-6 h-6 text-white"></i></div>
         const appIconSvg = `
         <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
             <rect width="512" height="512" rx="100" fill="#2563eb"/>
-            <!-- Package Icon Path -->
             <path d="M256 120 L100 200 L100 380 L256 460 L412 380 L412 200 Z" fill="none" stroke="white" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>
             <path d="M100 200 L256 280 L412 200" fill="none" stroke="white" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>
             <path d="M256 460 L256 280" fill="none" stroke="white" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>
@@ -266,6 +280,7 @@
 
         const state = {
             user: null,
+            authMode: 'login', // 'login' or 'register'
             inventory: [],
             locations: [],
             logs: [],
@@ -361,11 +376,13 @@
 
         async function logActivity(action, details) {
             try {
+                // Get current user email for tracking
+                const userName = state.user ? (state.user.email || 'Anonymous') : 'Unknown';
                 await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'logs'), {
                     action,
                     details,
                     timestamp: new Date().toISOString(),
-                    user: 'User' 
+                    user: userName // Track WHO made the change
                 });
             } catch (e) { console.error("Log error", e); }
         }
@@ -376,73 +393,24 @@
             } catch(e) { console.error("Save master error", e); }
         }
 
-        // --- CORE MODAL RENDERER (Moved Up) ---
+        // --- CORE MODAL RENDERER ---
         function renderModal(type, data = {}) {
             state.currentModal = { type, data };
             const container = document.getElementById('modal-container');
             const content = document.getElementById('modal-content');
             let html = '';
             
+            // ... (Same modal logic as before, just kept for brevity) ...
             if (type === 'addItem') {
                 const cats = state.masterData.categories || [];
                 const preCat = data.category;
                 const preSub = data.subCategory;
-
-                const catOptions = cats.length > 0 
-                    ? cats.map(c => `<option value="${c.name}" ${c.name === preCat ? 'selected' : ''}>${c.name}</option>`).join('') 
-                    : '<option value="" disabled>No categories. Go to Settings to add.</option>';
-                
+                const catOptions = cats.length > 0 ? cats.map(c => `<option value="${c.name}" ${c.name === preCat ? 'selected' : ''}>${c.name}</option>`).join('') : '<option value="" disabled>No categories. Go to Settings to add.</option>';
                 let subOptions = '<option value="" disabled selected>Select Category First</option>';
                 let idValue = '';
-
-                if (preCat) {
-                    const catObj = cats.find(c => c.name === preCat);
-                    if (catObj && catObj.subs) {
-                        subOptions = '<option value="" disabled>Select...</option>' + 
-                            catObj.subs.map(s => `<option value="${s}" ${s === preSub ? 'selected' : ''}>${s}</option>`).join('');
-                    }
-                }
-
-                if (preSub) {
-                     // Generate ID immediately using the smart logic
-                     let prefix = preSub.split(' ').map(word => word[0]).join('').toUpperCase();
-                     if (prefix.length < 2) prefix = preSub.substring(0, 2).toUpperCase();
-                     // Use the helper to find gap or new ID, respecting retired IDs
-                     idValue = app.generateNextId(prefix);
-                }
-                
-                html = `<div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100">
-                    <div class="flex justify-between items-center mb-6"><h2 class="text-xl font-bold flex items-center gap-2"><i data-lucide="plus-circle" class="w-6 h-6 text-blue-600"></i> Add New Item</h2><button onclick="app.closeModal()" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-5 h-5"></i></button></div>
-                    <form onsubmit="app.submitAddItem(event)" class="space-y-4">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="col-span-2">
-                                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Item Name</label>
-                                <input name="name" required placeholder="e.g., Godox SL60W" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" />
-                            </div>
-                            <div>
-                                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Category</label>
-                                <select id="input-category" name="category" required onchange="app.updateSubCategoryOptions(this.value)" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition cursor-pointer">
-                                    <option value="" disabled selected>Select...</option>
-                                    ${catOptions}
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Sub-Category</label>
-                                <select id="input-subcategory" name="subCategory" required onchange="app.generateIdFromSubCategory(this.value)" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition cursor-pointer">
-                                    ${subOptions}
-                                </select>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Quantity</label><input name="quantity" type="number" min="1" value="1" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" /></div>
-                            <div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Equipment ID</label><input id="input-equipment-id" name="equipmentId" required value="${idValue}" placeholder="e.g., SL-0001" class="w-full p-3 bg-gray-100 border border-gray-200 rounded-lg font-mono uppercase focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" /></div>
-                        </div>
-                        <div class="flex gap-3 pt-6 border-t border-gray-100 mt-2">
-                            <button type="button" onclick="app.closeModal()" class="flex-1 py-3 text-gray-600 font-medium hover:bg-gray-50 rounded-lg transition">Cancel</button>
-                            <button type="submit" class="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition transform active:scale-95">Save Item</button>
-                        </div>
-                    </form>
-                </div>`;
+                if (preCat) { const catObj = cats.find(c => c.name === preCat); if (catObj && catObj.subs) { subOptions = '<option value="" disabled>Select...</option>' + catObj.subs.map(s => `<option value="${s}" ${s === preSub ? 'selected' : ''}>${s}</option>`).join(''); } }
+                if (preSub) { let prefix = preSub.split(' ').map(word => word[0]).join('').toUpperCase(); if (prefix.length < 2) prefix = preSub.substring(0, 2).toUpperCase(); idValue = app.generateNextId(prefix); }
+                html = `<div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><div class="flex justify-between items-center mb-6"><h2 class="text-xl font-bold flex items-center gap-2"><i data-lucide="plus-circle" class="w-6 h-6 text-blue-600"></i> Add New Item</h2><button onclick="app.closeModal()" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-5 h-5"></i></button></div><form onsubmit="app.submitAddItem(event)" class="space-y-4"><div class="grid grid-cols-2 gap-4"><div class="col-span-2"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Item Name</label><input name="name" required placeholder="e.g., Godox SL60W" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" /></div><div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Category</label><select id="input-category" name="category" required onchange="app.updateSubCategoryOptions(this.value)" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition cursor-pointer"><option value="" disabled selected>Select...</option>${catOptions}</select></div><div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Sub-Category</label><select id="input-subcategory" name="subCategory" required onchange="app.generateIdFromSubCategory(this.value)" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition cursor-pointer">${subOptions}</select></div></div><div class="grid grid-cols-2 gap-4"><div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Quantity</label><input name="quantity" type="number" min="1" value="1" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" /></div><div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Equipment ID</label><input id="input-equipment-id" name="equipmentId" required value="${idValue}" placeholder="e.g., SL-0001" class="w-full p-3 bg-gray-100 border border-gray-200 rounded-lg font-mono uppercase focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" /></div></div><div class="flex gap-3 pt-6 border-t border-gray-100 mt-2"><button type="button" onclick="app.closeModal()" class="flex-1 py-3 text-gray-600 font-medium hover:bg-gray-50 rounded-lg transition">Cancel</button><button type="submit" class="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition transform active:scale-95">Save Item</button></div></form></div>`;
             } else if (type === 'manageCategory') {
                 const isRename = data.action === 'rename';
                 html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><h3 class="font-bold text-xl mb-6 text-gray-800">${isRename ? 'Rename Category' : 'New Category'}</h3><form onsubmit="app.submitManageCategory(event, '${data.action}', '${data.name || ''}')"><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Category Name</label><input name="name" required value="${data.name || ''}" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition mb-6" autofocus /><div class="flex justify-end gap-3"><button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button><button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-lg hover:bg-blue-700 transition transform active:scale-95">Save</button></div></form></div>`;
@@ -456,13 +424,7 @@
             } else if (type === 'addStock') {
                  const sampleItem = state.inventory.find(i => i.name === data.name && i.category === data.category && i.subCategory === data.subCategory);
                  let nextIdHint = '';
-                 if(sampleItem) {
-                     const match = sampleItem.equipmentId.match(/^(.*?)-?(\d+)$/);
-                     if(match) {
-                         const prefix = match[1] + (sampleItem.equipmentId.includes('-') ? '-' : '');
-                         nextIdHint = app.generateNextId(prefix);
-                     }
-                 }
+                 if(sampleItem) { const match = sampleItem.equipmentId.match(/^(.*?)-?(\d+)$/); if(match) { const prefix = match[1] + (sampleItem.equipmentId.includes('-') ? '-' : ''); nextIdHint = app.generateNextId(prefix); } }
                  html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100"><h3 class="font-bold text-xl mb-2 text-gray-800">Add Stock</h3><p class="text-sm text-gray-500 mb-6">Adding more: <strong>${data.name}</strong></p><form onsubmit="app.submitAddItem(event)" class="space-y-4"><input type="hidden" name="name" value="${data.name}"><input type="hidden" name="category" value="${data.category}"><input type="hidden" name="subCategory" value="${data.subCategory}"><div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Quantity to Add</label><input name="quantity" type="number" min="1" value="1" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" autofocus /></div><div><label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Start Equipment ID</label><input name="equipmentId" required value="${nextIdHint}" class="w-full p-3 bg-gray-100 border border-gray-200 rounded-lg font-mono uppercase focus:ring-2 focus:ring-blue-500 outline-none transition" /><p class="text-[10px] text-gray-400 mt-1">Adjust if necessary. Will increment automatically.</p></div><div class="flex justify-end gap-3 pt-2"><button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button><button type="submit" class="px-5 py-2.5 bg-green-600 text-white rounded-lg font-medium shadow-lg hover:bg-green-700 transition transform active:scale-95">Add Stock</button></div></form></div>`;
             } else if (type === 'addLocation') {
                 const isRoom = data.type === 'room'; const isBox = data.type === 'box'; let title = 'New Location'; let nextId = ''; if (data.type === 'floor') title = 'New Floor'; else if (isBox) { title = 'New Box'; const existingBoxes = state.locations.filter(l => l.type === 'box'); nextId = `Box ${existingBoxes.length + 1}`; } else if (isRoom) { title = 'New Room'; const parentFloor = state.locations.find(l => l.id === data.parentId); const existingRooms = state.locations.filter(l => l.type === 'room' && l.parentId === data.parentId); let prefix = "RM"; if (parentFloor) { prefix = getFloorPrefix(parentFloor.name); } const nextNum = String(existingRooms.length + 1).padStart(3, '0'); nextId = `${prefix}-${nextNum}`; }
@@ -533,6 +495,47 @@
 
         // --- 2. GENERATORS ---
 
+        function generateAuthView() {
+            const isLogin = state.authMode === 'login';
+            return `
+            <div class="bg-white w-full max-w-md p-8 rounded-2xl shadow-xl border border-gray-100 animate-in">
+                <div class="text-center mb-8">
+                    <div class="inline-block p-3 bg-blue-600 rounded-xl shadow-lg shadow-blue-200 mb-4">
+                        <i data-lucide="package" class="w-8 h-8 text-white"></i>
+                    </div>
+                    <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Inventory Manager</h1>
+                    <p class="text-sm text-gray-500 mt-2">Please sign in to access the system</p>
+                </div>
+
+                <form onsubmit="${isLogin ? 'app.handleLogin(event)' : 'app.handleRegister(event)'}" class="space-y-5">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 tracking-wider">Email Address</label>
+                        <div class="relative">
+                            <i data-lucide="mail" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5"></i>
+                            <input type="email" name="email" required placeholder="name@company.com" class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 tracking-wider">Password</label>
+                        <div class="relative">
+                            <i data-lucide="lock" class="absolute left-3 top-3.5 text-gray-400 w-5 h-5"></i>
+                            <input type="password" name="password" required placeholder="••••••••" class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition">
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition transform active:scale-[0.99] flex justify-center items-center gap-2">
+                        ${isLogin ? 'Sign In' : 'Create Account'} <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                </form>
+
+                <div class="mt-6 text-center">
+                    <button onclick="app.toggleAuthMode()" class="text-sm text-gray-500 hover:text-blue-600 font-medium transition">
+                        ${isLogin ? "Don't have an account? Create one" : "Already have an account? Sign In"}
+                    </button>
+                </div>
+            </div>`;
+        }
+
         function generateDashboardView() {
             const totalItems = state.inventory.filter(i => !i.isDisposed).length;
             const disposedItems = state.inventory.filter(i => i.isDisposed).length;
@@ -587,18 +590,18 @@
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
                         <h3 class="font-bold text-gray-800 mb-4">Room Occupancy</h3>
-                        <div class="grid grid-cols-3 gap-4 text-center">
-                            <div class="p-4 bg-green-50 rounded-lg border border-green-100">
-                                <span class="block text-2xl font-bold text-green-700">${vacantRooms}</span>
-                                <span class="text-xs font-medium text-green-600 uppercase">Vacant</span>
+                        <div class="grid grid-cols-3 gap-3 text-center">
+                            <div class="p-2 sm:p-4 bg-green-50 rounded-lg border border-green-100 flex flex-col justify-center items-center">
+                                <span class="block text-xl sm:text-2xl font-bold text-green-700">${vacantRooms}</span>
+                                <span class="text-[10px] sm:text-xs font-medium text-green-600 uppercase truncate w-full">Vacant</span>
                             </div>
-                            <div class="p-4 bg-red-50 rounded-lg border border-red-100">
-                                <span class="block text-2xl font-bold text-red-700">${occupiedRooms}</span>
-                                <span class="text-xs font-medium text-red-600 uppercase">Occupied</span>
+                            <div class="p-2 sm:p-4 bg-red-50 rounded-lg border border-red-100 flex flex-col justify-center items-center">
+                                <span class="block text-xl sm:text-2xl font-bold text-red-700">${occupiedRooms}</span>
+                                <span class="text-[10px] sm:text-xs font-medium text-red-600 uppercase truncate w-full">Occupied</span>
                             </div>
-                            <div class="p-4 bg-yellow-50 rounded-lg border border-yellow-100">
-                                <span class="block text-2xl font-bold text-yellow-700">${maintenanceRooms}</span>
-                                <span class="text-xs font-medium text-yellow-600 uppercase">Maintenance</span>
+                            <div class="p-2 sm:p-4 bg-yellow-50 rounded-lg border border-yellow-100 flex flex-col justify-center items-center">
+                                <span class="block text-xl sm:text-2xl font-bold text-yellow-700">${maintenanceRooms}</span>
+                                <span class="text-[10px] sm:text-xs font-medium text-yellow-600 uppercase truncate w-full">Maintenance</span>
                             </div>
                         </div>
                         <div class="mt-6">
@@ -742,7 +745,6 @@
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     <div class="divide-y divide-gray-100">
                         ${logs.map(log => {
-                            // Use PH Timezone
                             const date = formatDatePH(log.timestamp);
                             let icon = 'info';
                             let colorClass = 'text-gray-500 bg-gray-100';
@@ -753,6 +755,9 @@
                             else if (log.action.includes('Renamed')) { icon = 'edit-2'; colorClass = 'text-orange-600 bg-orange-50'; }
                             else if (log.action.includes('Swap')) { icon = 'refresh-cw'; colorClass = 'text-purple-600 bg-purple-50'; }
 
+                            // Log User
+                            const userLabel = log.user ? `<span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded ml-2 uppercase tracking-wide border border-blue-100">${window.esc(log.user.split('@')[0])}</span>` : '';
+
                             return `
                             <div class="p-4 flex gap-4 hover:bg-gray-50 transition">
                                 <div class="mt-1">
@@ -762,7 +767,7 @@
                                 </div>
                                 <div class="flex-1">
                                     <div class="flex justify-between items-start">
-                                        <h4 class="font-bold text-sm text-gray-900">${log.action}</h4>
+                                        <h4 class="font-bold text-sm text-gray-900 flex items-center">${log.action} ${userLabel}</h4>
                                         <span class="text-xs text-gray-400 whitespace-nowrap ml-2">${date}</span>
                                     </div>
                                     <p class="text-sm text-gray-600 mt-1 whitespace-pre-line">${log.details}</p>
@@ -794,340 +799,21 @@
                 ${state.settingsTab === 'categories' ? generateCategorySettings() : 
                   state.settingsTab === 'locations' ? generateLocationSettings() : 
                   generateReportSettings()}
-            </div>`;
-        }
-
-        function generateReportSettings() {
-            return `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div class="bg-red-100 p-2.5 rounded-lg text-red-600">
-                            <i data-lucide="file-text" class="w-6 h-6"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-lg font-bold text-gray-800">Generate PDF Report</h3>
-                            <p class="text-sm text-gray-500">Select content to include in the document</p>
-                        </div>
-                    </div>
-                    
-                    <div class="space-y-4 mb-8">
-                        <label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition">
-                            <input type="checkbox" id="report-summary" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
-                            <div>
-                                <span class="font-bold text-gray-700 text-sm block">Executive Summary</span>
-                                <span class="text-xs text-gray-400">Dashboard statistics and charts</span>
-                            </div>
-                        </label>
-                        <label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition">
-                            <input type="checkbox" id="report-inventory" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
-                            <div>
-                                <span class="font-bold text-gray-700 text-sm block">Full Inventory List</span>
-                                <span class="text-xs text-gray-400">Detailed list of all active items</span>
-                            </div>
-                        </label>
-                        <label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition">
-                            <input type="checkbox" id="report-locations" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
-                            <div>
-                                <span class="font-bold text-gray-700 text-sm block">Location Status</span>
-                                <span class="text-xs text-gray-400">Room occupancy and floor details</span>
-                            </div>
-                        </label>
-                        <label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition">
-                            <input type="checkbox" id="report-logs" class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
-                            <div>
-                                <span class="font-bold text-gray-700 text-sm block">Activity Logs</span>
-                                <span class="text-xs text-gray-400">Recent system actions (Last 50)</span>
-                            </div>
-                        </label>
-                    </div>
-
-                    <button onclick="app.generatePDF()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg shadow-blue-200 transition flex items-center justify-center gap-2">
-                        <i data-lucide="download" class="w-5 h-5"></i> Download PDF Report
+                
+                <div class="mt-8 border-t border-gray-200 pt-6">
+                    <button onclick="app.handleLogout()" class="w-full sm:w-auto px-6 py-3 bg-red-50 text-red-600 hover:bg-red-100 font-bold rounded-xl transition flex items-center justify-center gap-2">
+                        <i data-lucide="log-out" class="w-5 h-5"></i> Log Out
                     </button>
                 </div>
-
-                <div class="bg-blue-50 border border-blue-100 rounded-xl p-6 flex flex-col justify-center items-center text-center">
-                    <img src="https://illustrations.popsy.co/amber/success.svg" class="w-48 h-48 mb-6 opacity-80" alt="Report Illustration">
-                    <h3 class="text-xl font-bold text-blue-900 mb-2">Professional Reporting</h3>
-                    <p class="text-sm text-blue-700 max-w-xs">Generate clean, branded PDF reports for audits, inventory checks, or management reviews with a single click.</p>
-                </div>
-            </div>
-            `;
-        }
-
-        function generateCategorySettings() {
-            const categories = state.masterData.categories || [];
-            if (categories.length === 0) {
-                 return `<div class="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
-                    <p class="text-gray-500 mb-4">No categories defined.</p>
-                    <button onclick="app.openManageCategoryModal('add')" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">Create First Category</button>
-                 </div>`;
-            }
-
-            return `
-            <div class="grid grid-cols-1 gap-6">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-lg font-bold text-gray-800">All Categories</h3>
-                    <button onclick="app.openManageCategoryModal('add')" class="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow hover:bg-blue-700 transition"><i data-lucide="plus" class="w-4 h-4"></i> New Category</button>
-                </div>
-                <div class="space-y-4">
-                    ${categories.map(cat => `
-                        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                            <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center group">
-                                <div class="font-bold text-gray-800 flex items-center gap-2"><i data-lucide="folder" class="w-4 h-4 text-blue-500"></i> ${cat.name}</div>
-                                <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition">
-                                    <button onclick="app.openManageCategoryModal('rename', '${window.esc(cat.name)}')" class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-white rounded-md transition" title="Rename"><i data-lucide="pencil" class="w-4 h-4"></i></button>
-                                    <button onclick="app.deleteMasterCategory('${window.esc(cat.name)}')" class="p-1.5 text-gray-500 hover:text-red-600 hover:bg-white rounded-md transition" title="Delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                </div>
-                            </div>
-                            <div class="p-4">
-                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    ${cat.subs && cat.subs.length > 0 ? cat.subs.map(sub => `
-                                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100 group/sub hover:border-blue-200 transition">
-                                            <span class="text-sm font-medium text-gray-700">${sub}</span>
-                                            <div class="flex gap-1 opacity-0 group-hover/sub:opacity-100 transition">
-                                                <button onclick="app.openMoveSubCategoryModal('${window.esc(sub)}', '${window.esc(cat.name)}')" class="p-1 text-gray-400 hover:text-orange-600" title="Move Category"><i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i></button>
-                                                <button onclick="app.openManageSubCategoryModal('rename', '${window.esc(cat.name)}', '${window.esc(sub)}')" class="p-1 text-gray-400 hover:text-blue-600" title="Rename"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
-                                                <button onclick="app.deleteMasterSubCategory('${window.esc(cat.name)}', '${window.esc(sub)}')" class="p-1 text-gray-400 hover:text-red-600" title="Delete"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
-                                            </div>
-                                        </div>
-                                    `).join('') : '<span class="text-sm text-gray-400 italic">No sub-categories</span>'}
-                                    <button onclick="app.openManageSubCategoryModal('add', '${window.esc(cat.name)}')" class="flex items-center justify-center gap-2 p-3 border border-dashed border-gray-300 rounded-lg text-gray-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition text-sm font-medium">
-                                        <i data-lucide="plus" class="w-4 h-4"></i> Add Sub-Category
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
             </div>`;
         }
 
-        // --- NEW: Location Settings Generator (Fix for ReferenceError) ---
-        function generateLocationSettings() {
-             const floors = state.locations.filter(l => l.type === 'floor').sort((a,b) => a.name.localeCompare(b.name));
-             const boxes = state.locations.filter(l => l.type === 'box').sort((a,b) => a.name.localeCompare(b.name));
-
-             return `
-             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <!-- Floors & Rooms -->
-                <div class="space-y-4">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-bold text-gray-800">Floors & Rooms</h3>
-                        <button onclick="app.openAddLocationModal('floor')" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100 transition">+ Add Floor</button>
-                    </div>
-                    <div class="space-y-4">
-                        ${floors.map(floor => {
-                            const rooms = state.locations.filter(l => l.parentId === floor.id).sort((a,b) => a.name.localeCompare(b.name));
-                            return `
-                            <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                                <div class="bg-gray-50 px-3 py-2 border-b border-gray-200 flex justify-between items-center">
-                                    <span class="font-bold text-gray-800 text-sm flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4 text-indigo-500"></i> ${floor.name}</span>
-                                    <div class="flex gap-1">
-                                        <button onclick="app.openAddLocationModal('room', '${floor.id}')" class="text-xs bg-white border border-gray-300 px-2 py-0.5 rounded text-gray-600 hover:bg-gray-50">+ Room</button>
-                                        <button onclick="app.openEditLocationModal('${floor.id}')" class="text-gray-400 hover:text-blue-600 p-1"><i data-lucide="settings-2" class="w-3.5 h-3.5"></i></button>
-                                    </div>
-                                </div>
-                                <div class="p-2 space-y-1">
-                                    ${rooms.length > 0 ? rooms.map(room => `
-                                        <div class="flex justify-between items-center p-2 rounded hover:bg-gray-50 group">
-                                            <div class="flex items-center gap-2">
-                                                <div class="w-1.5 h-1.5 rounded-full ${room.status === 'occupied' ? 'bg-red-500' : (room.status === 'maintenance' ? 'bg-yellow-500' : 'bg-green-500')}"></div>
-                                                <span class="text-sm text-gray-700">${room.name}</span>
-                                                <span class="text-[10px] text-gray-400 font-mono border px-1 rounded">${room.customId || 'N/A'}</span>
-                                            </div>
-                                            <button onclick="app.openEditLocationModal('${room.id}')" class="text-gray-300 hover:text-blue-600 p-1 opacity-0 group-hover:opacity-100 transition"><i data-lucide="pencil" class="w-3 h-3"></i></button>
-                                        </div>
-                                    `).join('') : '<div class="p-2 text-xs text-gray-400 italic text-center">No rooms</div>'}
-                                </div>
-                            </div>`;
-                        }).join('')}
-                    </div>
-                </div>
-
-                <!-- Boxes -->
-                <div class="space-y-4">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-bold text-gray-800">Boxes & Containers</h3>
-                        <button onclick="app.openAddLocationModal('box')" class="px-3 py-1.5 bg-orange-50 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-100 transition">+ Add Box</button>
-                    </div>
-                    <div class="bg-white border border-gray-200 rounded-xl p-4">
-                        ${boxes.length > 0 ? `<div class="grid grid-cols-2 gap-3">
-                            ${boxes.map(box => `
-                                <div class="flex justify-between items-center p-2 border border-gray-100 rounded-lg hover:border-orange-200 group">
-                                    <div class="flex items-center gap-2">
-                                        <i data-lucide="box" class="w-4 h-4 text-orange-500"></i>
-                                        <span class="text-sm font-medium text-gray-700 truncate">${box.name}</span>
-                                    </div>
-                                    <button onclick="app.openEditLocationModal('${box.id}')" class="text-gray-300 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
-                                </div>
-                            `).join('')}
-                        </div>` : '<div class="text-center py-8 text-gray-400 italic">No boxes registered.</div>'}
-                    </div>
-                </div>
-             </div>`;
-        }
-
-        function generateInventoryItems() {
-            const term = state.searchTerm.toLowerCase();
-            const isDisposalMode = state.storageViewMode === 'disposal';
-            
-            let filtered = state.inventory.filter(item => {
-                const matchesMode = isDisposalMode ? item.isDisposed : !item.isDisposed;
-                const matchesTerm = item.name.toLowerCase().includes(term) ||
-                    item.equipmentId.toLowerCase().includes(term) ||
-                    (item.category && item.category.toLowerCase().includes(term));
-                return matchesMode && matchesTerm;
-            });
-
-            if (filtered.length === 0 && (state.masterData.categories || []).length === 0) {
-                const emptyMsg = isDisposalMode ? "Pullout bin is empty." : "No active items found.";
-                return `<div class="flex flex-col items-center justify-center py-20 text-gray-400"><i data-lucide="${isDisposalMode ? 'trash-2' : 'package-open'}" class="w-16 h-16 mb-4 opacity-20"></i><p>${emptyMsg}</p></div>`;
-            }
-
-            // --- Structure Building Logic (Modified to include empty Master Data categories) ---
-            const grouped = {};
-
-            // 1. Initialize structure from Master Data (if Active mode)
-            if (!isDisposalMode) {
-                (state.masterData.categories || []).forEach(cat => {
-                    grouped[cat.name] = {};
-                    if(cat.subs) {
-                        cat.subs.forEach(sub => {
-                            grouped[cat.name][sub] = {};
-                        });
-                    }
-                });
-            }
-
-            // 2. Populate with actual inventory items
-            filtered.forEach(item => {
-                const cat = item.category || 'Uncategorized';
-                const sub = item.subCategory || 'General';
-                const name = item.name || 'Unnamed';
-                
-                if (!grouped[cat]) grouped[cat] = {};
-                if (!grouped[cat][sub]) grouped[cat][sub] = {};
-                if (!grouped[cat][sub][name]) grouped[cat][sub][name] = [];
-                grouped[cat][sub][name].push(item);
-            });
-
-            let html = '';
-            
-            Object.keys(grouped).sort().forEach(cat => {
-                const subKeys = Object.keys(grouped[cat]).sort();
-                // Render category block
-                html += `<div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm mb-4">`;
-                html += `<div class="bg-gray-50 px-4 py-3 border-b border-gray-200 font-bold text-gray-700 flex items-center gap-2">
-                    <div class="flex items-center gap-2 flex-1"><i data-lucide="folder" class="w-4 h-4 text-blue-500"></i> ${cat}</div>
-                    ${!isDisposalMode ? `<div class="flex gap-1">
-                        <button onclick="app.openRenameModal('category', '${window.esc(cat)}')" class="text-gray-300 hover:text-blue-500 p-1 rounded transition" title="Rename"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
-                    </div>` : ''}
-                </div>`;
-                html += `<div class="p-4 space-y-4">`;
-                
-                if (subKeys.length === 0) {
-                     html += `<div class="text-xs text-gray-400 italic">No sub-categories defined.</div>`;
-                }
-
-                subKeys.forEach(sub => {
-                    const itemNames = Object.keys(grouped[cat][sub]).sort();
-                    
-                    html += `<div class="space-y-3">`;
-                    html += `<h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 group/sub">
-                        <span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span> ${sub}
-                        ${!isDisposalMode ? `
-                        <button onclick="app.openAddItemModal({category: '${window.esc(cat)}', subCategory: '${window.esc(sub)}'})" class="text-gray-300 hover:text-blue-600 p-1 rounded transition opacity-0 group-hover/sub:opacity-100" title="Add New Item to ${sub}"><i data-lucide="plus-circle" class="w-3.5 h-3.5"></i></button>
-                        <button onclick="app.openRenameModal('subCategory', '${window.esc(sub)}', '${window.esc(cat)}')" class="text-gray-300 hover:text-blue-500 p-1 rounded transition opacity-0 group-hover/sub:opacity-100" title="Rename"><i data-lucide="pencil" class="w-3 h-3"></i></button>
-                        ` : ''}
-                    </h4>`;
-                    
-                    if (itemNames.length === 0) {
-                        html += `<div class="text-xs text-gray-300 italic pl-4 py-2 border border-dashed border-gray-200 rounded">No items in this category yet.</div>`;
-                    } else {
-                        html += `<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">`;
-                        
-                        itemNames.forEach(name => {
-                            const items = grouped[cat][sub][name];
-                            items.sort((a,b) => a.equipmentId.localeCompare(b.equipmentId, undefined, {numeric: true}));
-                            
-                            const stockCount = items.filter(i => !i.locationId).length;
-                            const totalCount = items.length;
-                            const hasStock = stockCount > 0;
-                            
-                            const cardBg = hasStock || isDisposalMode ? "bg-white" : "bg-gray-50 opacity-90";
-                            const badgeColor = hasStock ? "bg-blue-100 text-blue-700" : (isDisposalMode ? "bg-red-100 text-red-700" : "bg-gray-200 text-gray-600");
-                            const badgeText = isDisposalMode ? `${totalCount} Pulled Out` : (hasStock ? `${stockCount} In Stock` : `No Stock (0/${totalCount})`);
-
-                            let itemsListHtml = '';
-                            const itemsToShow = items; 
-
-                            if (itemsToShow.length > 0) {
-                                itemsListHtml = itemsToShow.map((i, index) => {
-                                    const statusColor = i.condition === 'Defective' ? 'bg-red-500' : 'bg-green-500';
-                                    const isLastItem = index === itemsToShow.length - 1;
-
-                                    let actionButtons = '';
-                                    if (!isDisposalMode) {
-                                        actionButtons = `
-                                            <button onclick="app.openMoveItemModal('${i.id}')" class="text-gray-400 hover:text-blue-600 p-1" title="Move Location">
-                                                <i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i>
-                                            </button>
-                                            ${isLastItem ? `
-                                            <button onclick="app.deleteItem('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', false)" class="text-gray-300 hover:text-red-500 p-1" title="Delete (Reuse ID)">
-                                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                                            </button>` : '<span class="w-5.5 inline-block"></span>'} 
-                                            `;
-                                    } else {
-                                        actionButtons = `
-                                            <button onclick="app.toggleDisposal('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', true)" class="text-green-600 hover:text-green-800 p-1" title="Restore to Inventory">
-                                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-                                            </button>
-                                            <button onclick="app.deleteItem('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', true)" class="text-red-400 hover:text-red-700 p-1" title="Delete Permanently">
-                                                <i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
-                                            </button>`;
-                                    }
-
-                                    return `
-                                    <div class="flex justify-between items-center text-xs p-2 bg-gray-50 rounded border border-gray-100 hover:border-blue-200 transition group/item">
-                                        <div class="flex items-center gap-2 flex-1 min-w-0">
-                                            <button onclick="app.toggleCondition('${i.id}', '${i.condition || 'Working'}')" class="w-2.5 h-2.5 rounded-full ${statusColor} hover:scale-125 transition flex-none" title="${i.condition || 'Working'} (Click to toggle)"></button>
-                                            <span class="font-mono font-bold text-blue-600 flex-none">${i.equipmentId}</span>
-                                            ${!isDisposalMode ? `<div class="truncate pl-2 text-[10px] text-right flex-1">${getLocationName(i.locationId)}</div>` : ''}
-                                        </div>
-                                        <div class="flex gap-1 pl-2 transition">
-                                            ${actionButtons}
-                                        </div>
-                                    </div>
-                                `}).join('');
-                            } else {
-                                itemsListHtml = `<div class="text-xs text-gray-400 italic text-center py-2">No items listed</div>`;
-                            }
-
-                            html += `
-                            <div class="${cardBg} border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 flex flex-col h-full relative group/card">
-                                <div class="flex justify-between items-start mb-3 pb-2 border-b border-gray-100">
-                                    <div>
-                                        <h3 class="font-bold text-gray-900 text-sm leading-tight pr-2 flex items-center gap-1">
-                                            ${name}
-                                            ${!isDisposalMode ? `<button onclick="app.openEditItemNameModal('${items[0].id}')" class="text-gray-300 hover:text-blue-600 ml-1 inline-block"><i data-lucide="pencil" class="w-3 h-3"></i></button>` : ''}
-                                        </h3>
-                                        <span class="${badgeColor} text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1">${badgeText}</span>
-                                    </div>
-                                    ${!isDisposalMode ? `<button onclick="app.openAddStockModal('${window.esc(cat)}', '${window.esc(sub)}', '${window.esc(name)}')" class="text-blue-600 hover:bg-blue-50 p-1 rounded-full transition" title="Add Stock"><i data-lucide="plus-circle" class="w-5 h-5"></i></button>` : ''}
-                                </div>
-                                <div class="flex-1 overflow-y-auto max-h-48 space-y-1 custom-scrollbar pr-1">${itemsListHtml}</div>
-                            </div>`;
-                        });
-                        html += `</div>`;
-                    }
-                    html += `</div>`;
-                });
-                html += `</div></div>`;
-            });
-            return html;
-        }
+        // ... [Include generateReportSettings, generateCategorySettings, generateLocationSettings, generateInventoryItems as they were, no changes needed for this prompt] ...
+        // Re-injecting standard view functions to ensure completeness
+        function generateReportSettings() { return `<div class="grid grid-cols-1 md:grid-cols-2 gap-8"><div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm"><div class="flex items-center gap-3 mb-4"><div class="bg-red-100 p-2.5 rounded-lg text-red-600"><i data-lucide="file-text" class="w-6 h-6"></i></div><div><h3 class="text-lg font-bold text-gray-800">Generate PDF Report</h3><p class="text-sm text-gray-500">Select content to include</p></div></div><div class="space-y-4 mb-8"><label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition"><input type="checkbox" id="report-summary" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"><div><span class="font-bold text-gray-700 text-sm block">Executive Summary</span><span class="text-xs text-gray-400">Stats and charts</span></div></label><label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition"><input type="checkbox" id="report-inventory" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"><div><span class="font-bold text-gray-700 text-sm block">Full Inventory List</span><span class="text-xs text-gray-400">Active items</span></div></label><label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition"><input type="checkbox" id="report-locations" checked class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"><div><span class="font-bold text-gray-700 text-sm block">Location Status</span><span class="text-xs text-gray-400">Room details</span></div></label><label class="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition"><input type="checkbox" id="report-logs" class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"><div><span class="font-bold text-gray-700 text-sm block">Activity Logs</span><span class="text-xs text-gray-400">Recent actions</span></div></label></div><button onclick="app.generatePDF()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg shadow-blue-200 transition flex items-center justify-center gap-2"><i data-lucide="download" class="w-5 h-5"></i> Download PDF Report</button></div><div class="bg-blue-50 border border-blue-100 rounded-xl p-6 flex flex-col justify-center items-center text-center"><img src="https://illustrations.popsy.co/amber/success.svg" class="w-48 h-48 mb-6 opacity-80" alt="Report"><h3 class="text-xl font-bold text-blue-900 mb-2">Professional Reporting</h3><p class="text-sm text-blue-700 max-w-xs">Generate clean, branded PDF reports for audits and reviews.</p></div></div>`; }
+        function generateCategorySettings() { const categories = state.masterData.categories || []; if (categories.length === 0) return `<div class="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300"><p class="text-gray-500 mb-4">No categories defined.</p><button onclick="app.openManageCategoryModal('add')" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">Create First Category</button></div>`; return `<div class="grid grid-cols-1 gap-6"><div class="flex justify-between items-center"><h3 class="text-lg font-bold text-gray-800">All Categories</h3><button onclick="app.openManageCategoryModal('add')" class="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow hover:bg-blue-700 transition"><i data-lucide="plus" class="w-4 h-4"></i> New Category</button></div><div class="space-y-4">${categories.map(cat => `<div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm"><div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center group"><div class="font-bold text-gray-800 flex items-center gap-2"><i data-lucide="folder" class="w-4 h-4 text-blue-500"></i> ${cat.name}</div><div class="flex gap-2 opacity-0 group-hover:opacity-100 transition"><button onclick="app.openManageCategoryModal('rename', '${window.esc(cat.name)}')" class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-white rounded-md transition" title="Rename"><i data-lucide="pencil" class="w-4 h-4"></i></button><button onclick="app.deleteMasterCategory('${window.esc(cat.name)}')" class="p-1.5 text-gray-500 hover:text-red-600 hover:bg-white rounded-md transition" title="Delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div></div><div class="p-4"><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">${cat.subs && cat.subs.length > 0 ? cat.subs.map(sub => `<div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100 group/sub hover:border-blue-200 transition"><span class="text-sm font-medium text-gray-700">${sub}</span><div class="flex gap-1 opacity-0 group-hover/sub:opacity-100 transition"><button onclick="app.openMoveSubCategoryModal('${window.esc(sub)}', '${window.esc(cat.name)}')" class="p-1 text-gray-400 hover:text-orange-600" title="Move"><i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i></button><button onclick="app.openManageSubCategoryModal('rename', '${window.esc(cat.name)}', '${window.esc(sub)}')" class="p-1 text-gray-400 hover:text-blue-600" title="Rename"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button><button onclick="app.deleteMasterSubCategory('${window.esc(cat.name)}', '${window.esc(sub)}')" class="p-1 text-gray-400 hover:text-red-600" title="Delete"><i data-lucide="x" class="w-3.5 h-3.5"></i></button></div></div>`).join('') : '<span class="text-sm text-gray-400 italic">No sub-categories</span>'}<button onclick="app.openManageSubCategoryModal('add', '${window.esc(cat.name)}')" class="flex items-center justify-center gap-2 p-3 border border-dashed border-gray-300 rounded-lg text-gray-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition text-sm font-medium"><i data-lucide="plus" class="w-4 h-4"></i> Add Sub-Category</button></div></div></div>`).join('')}</div></div>`; }
+        function generateLocationSettings() { const floors = state.locations.filter(l => l.type === 'floor').sort((a,b) => a.name.localeCompare(b.name)); const boxes = state.locations.filter(l => l.type === 'box').sort((a,b) => a.name.localeCompare(b.name)); return `<div class="grid grid-cols-1 lg:grid-cols-2 gap-8"><div class="space-y-4"><div class="flex justify-between items-center"><h3 class="text-lg font-bold text-gray-800">Floors & Rooms</h3><button onclick="app.openAddLocationModal('floor')" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100 transition">+ Add Floor</button></div><div class="space-y-4">${floors.map(floor => { const rooms = state.locations.filter(l => l.parentId === floor.id).sort((a,b) => a.name.localeCompare(b.name)); return `<div class="bg-white border border-gray-200 rounded-lg overflow-hidden"><div class="bg-gray-50 px-3 py-2 border-b border-gray-200 flex justify-between items-center"><span class="font-bold text-gray-800 text-sm flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4 text-indigo-500"></i> ${floor.name}</span><div class="flex gap-1"><button onclick="app.openAddLocationModal('room', '${floor.id}')" class="text-xs bg-white border border-gray-300 px-2 py-0.5 rounded text-gray-600 hover:bg-gray-50">+ Room</button><button onclick="app.openEditLocationModal('${floor.id}')" class="text-gray-400 hover:text-blue-600 p-1"><i data-lucide="settings-2" class="w-3.5 h-3.5"></i></button></div></div><div class="p-2 space-y-1">${rooms.length > 0 ? rooms.map(room => `<div class="flex justify-between items-center p-2 rounded hover:bg-gray-50 group"><div class="flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full ${room.status === 'occupied' ? 'bg-red-500' : (room.status === 'maintenance' ? 'bg-yellow-500' : 'bg-green-500')}"></div><span class="text-sm text-gray-700">${room.name}</span><span class="text-[10px] text-gray-400 font-mono border px-1 rounded">${room.customId || 'N/A'}</span></div><button onclick="app.openEditLocationModal('${room.id}')" class="text-gray-300 hover:text-blue-600 p-1 opacity-0 group-hover:opacity-100 transition"><i data-lucide="pencil" class="w-3 h-3"></i></button></div>`).join('') : '<div class="p-2 text-xs text-gray-400 italic text-center">No rooms</div>'}</div></div>`; }).join('')}</div></div><div class="space-y-4"><div class="flex justify-between items-center"><h3 class="text-lg font-bold text-gray-800">Boxes & Containers</h3><button onclick="app.openAddLocationModal('box')" class="px-3 py-1.5 bg-orange-50 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-100 transition">+ Add Box</button></div><div class="bg-white border border-gray-200 rounded-xl p-4">${boxes.length > 0 ? `<div class="grid grid-cols-2 gap-3">${boxes.map(box => `<div class="flex justify-between items-center p-2 border border-gray-100 rounded-lg hover:border-orange-200 group"><div class="flex items-center gap-2"><i data-lucide="box" class="w-4 h-4 text-orange-500"></i><span class="text-sm font-medium text-gray-700 truncate">${box.name}</span></div><button onclick="app.openEditLocationModal('${box.id}')" class="text-gray-300 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button></div>`).join('')}</div>` : '<div class="text-center py-8 text-gray-400 italic">No boxes registered.</div>'}</div></div></div>`; }
+        function generateInventoryItems() { const term = state.searchTerm.toLowerCase(); const isDisposalMode = state.storageViewMode === 'disposal'; let filtered = state.inventory.filter(item => { const matchesMode = isDisposalMode ? item.isDisposed : !item.isDisposed; const matchesTerm = item.name.toLowerCase().includes(term) || item.equipmentId.toLowerCase().includes(term) || (item.category && item.category.toLowerCase().includes(term)); return matchesMode && matchesTerm; }); if (filtered.length === 0 && (state.masterData.categories || []).length === 0) { const emptyMsg = isDisposalMode ? "Pullout bin is empty." : "No active items found."; return `<div class="flex flex-col items-center justify-center py-20 text-gray-400"><i data-lucide="${isDisposalMode ? 'trash-2' : 'package-open'}" class="w-16 h-16 mb-4 opacity-20"></i><p>${emptyMsg}</p></div>`; } const grouped = {}; if (!isDisposalMode) { (state.masterData.categories || []).forEach(cat => { grouped[cat.name] = {}; if(cat.subs) { cat.subs.forEach(sub => { grouped[cat.name][sub] = {}; }); } }); } filtered.forEach(item => { const cat = item.category || 'Uncategorized'; const sub = item.subCategory || 'General'; const name = item.name || 'Unnamed'; if (!grouped[cat]) grouped[cat] = {}; if (!grouped[cat][sub]) grouped[cat][sub] = {}; if (!grouped[cat][sub][name]) grouped[cat][sub][name] = []; grouped[cat][sub][name].push(item); }); let html = ''; Object.keys(grouped).sort().forEach(cat => { const subKeys = Object.keys(grouped[cat]).sort(); html += `<div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm mb-4">`; html += `<div class="bg-gray-50 px-4 py-3 border-b border-gray-200 font-bold text-gray-700 flex items-center gap-2"><div class="flex items-center gap-2 flex-1"><i data-lucide="folder" class="w-4 h-4 text-blue-500"></i> ${cat}</div>${!isDisposalMode ? `<div class="flex gap-1"><button onclick="app.openRenameModal('category', '${window.esc(cat)}')" class="text-gray-300 hover:text-blue-500 p-1 rounded transition" title="Rename"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button></div>` : ''}</div>`; html += `<div class="p-4 space-y-4">`; if (subKeys.length === 0) { html += `<div class="text-xs text-gray-400 italic">No sub-categories defined.</div>`; } subKeys.forEach(sub => { const itemNames = Object.keys(grouped[cat][sub]).sort(); html += `<div class="space-y-3">`; html += `<h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 group/sub"><span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span> ${sub}${!isDisposalMode ? `<button onclick="app.openAddItemModal({category: '${window.esc(cat)}', subCategory: '${window.esc(sub)}'})" class="text-gray-300 hover:text-blue-600 p-1 rounded transition opacity-0 group-hover/sub:opacity-100" title="Add New Item to ${sub}"><i data-lucide="plus-circle" class="w-3.5 h-3.5"></i></button><button onclick="app.openRenameModal('subCategory', '${window.esc(sub)}', '${window.esc(cat)}')" class="text-gray-300 hover:text-blue-500 p-1 rounded transition opacity-0 group-hover/sub:opacity-100" title="Rename"><i data-lucide="pencil" class="w-3 h-3"></i></button>` : ''}</h4>`; if (itemNames.length === 0) { html += `<div class="text-xs text-gray-300 italic pl-4 py-2 border border-dashed border-gray-200 rounded">No items in this category yet.</div>`; } else { html += `<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">`; itemNames.forEach(name => { const items = grouped[cat][sub][name]; items.sort((a,b) => a.equipmentId.localeCompare(b.equipmentId, undefined, {numeric: true})); const stockCount = items.filter(i => !i.locationId).length; const totalCount = items.length; const hasStock = stockCount > 0; const cardBg = hasStock || isDisposalMode ? "bg-white" : "bg-gray-50 opacity-90"; const badgeColor = hasStock ? "bg-blue-100 text-blue-700" : (isDisposalMode ? "bg-red-100 text-red-700" : "bg-gray-200 text-gray-600"); const badgeText = isDisposalMode ? `${totalCount} Pulled Out` : (hasStock ? `${stockCount} In Stock` : `No Stock (0/${totalCount})`); let itemsListHtml = ''; const itemsToShow = items; if (itemsToShow.length > 0) { itemsListHtml = itemsToShow.map((i, index) => { const statusColor = i.condition === 'Defective' ? 'bg-red-500' : 'bg-green-500'; const isLastItem = index === itemsToShow.length - 1; let actionButtons = ''; if (!isDisposalMode) { actionButtons = `<button onclick="app.openMoveItemModal('${i.id}')" class="text-gray-400 hover:text-blue-600 p-1" title="Move Location"><i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i></button>${isLastItem ? `<button onclick="app.deleteItem('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', false)" class="text-gray-300 hover:text-red-500 p-1" title="Delete (Reuse ID)"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : '<span class="w-5.5 inline-block"></span>'}`; } else { actionButtons = `<button onclick="app.toggleDisposal('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', true)" class="text-green-600 hover:text-green-800 p-1" title="Restore to Inventory"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i></button><button onclick="app.deleteItem('${i.id}', '${window.esc(i.name)}', '${window.esc(i.equipmentId)}', true)" class="text-red-400 hover:text-red-700 p-1" title="Delete Permanently"><i data-lucide="x-circle" class="w-3.5 h-3.5"></i></button>`; } return `<div class="flex justify-between items-center text-xs p-2 bg-gray-50 rounded border border-gray-100 hover:border-blue-200 transition group/item"><div class="flex items-center gap-2 flex-1 min-w-0"><button onclick="app.toggleCondition('${i.id}', '${i.condition || 'Working'}')" class="w-2.5 h-2.5 rounded-full ${statusColor} hover:scale-125 transition flex-none" title="${i.condition || 'Working'} (Click to toggle)"></button><span class="font-mono font-bold text-blue-600 flex-none">${i.equipmentId}</span>${!isDisposalMode ? `<div class="truncate pl-2 text-[10px] text-right flex-1">${getLocationName(i.locationId)}</div>` : ''}</div><div class="flex gap-1 pl-2 transition">${actionButtons}</div></div>`}).join(''); } else { itemsListHtml = `<div class="text-xs text-gray-400 italic text-center py-2">No items listed</div>`; } html += `<div class="${cardBg} border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 flex flex-col h-full relative group/card"><div class="flex justify-between items-start mb-3 pb-2 border-b border-gray-100"><div><h3 class="font-bold text-gray-900 text-sm leading-tight pr-2 flex items-center gap-1">${name}${!isDisposalMode ? `<button onclick="app.openEditItemNameModal('${items[0].id}')" class="text-gray-300 hover:text-blue-600 ml-1 inline-block"><i data-lucide="pencil" class="w-3 h-3"></i></button>` : ''}</h3><span class="${badgeColor} text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1">${badgeText}</span></div>${!isDisposalMode ? `<button onclick="app.openAddStockModal('${window.esc(cat)}', '${window.esc(sub)}', '${window.esc(name)}')" class="text-blue-600 hover:bg-blue-50 p-1 rounded-full transition" title="Add Stock"><i data-lucide="plus-circle" class="w-5 h-5"></i></button>` : ''}</div><div class="flex-1 overflow-y-auto max-h-48 space-y-1 custom-scrollbar pr-1">${itemsListHtml}</div></div>`; }); html += `</div>`; } html += `</div>`; }); html += `</div></div>`; }); return html; }
 
         // --- Global App Object ---
         window.app = {
@@ -1144,6 +830,42 @@
                 state.settingsTab = tab;
                 renderMainContent();
             },
+            toggleAuthMode: () => {
+                state.authMode = state.authMode === 'login' ? 'register' : 'login';
+                document.getElementById('auth-container').innerHTML = generateAuthView();
+                lucide.createIcons();
+            },
+            handleLogin: async (e) => {
+                e.preventDefault();
+                const email = e.target.email.value;
+                const password = e.target.password.value;
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                    showToast("Signed In Successfully");
+                } catch (error) {
+                    showToast(error.message, 'error');
+                }
+            },
+            handleRegister: async (e) => {
+                e.preventDefault();
+                const email = e.target.email.value;
+                const password = e.target.password.value;
+                try {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                    showToast("Account Created");
+                } catch (error) {
+                    showToast(error.message, 'error');
+                }
+            },
+            handleLogout: async () => {
+                try {
+                    await signOut(auth);
+                    showToast("Logged Out");
+                } catch (error) {
+                    console.error(error);
+                }
+            },
+            // ... (keep existing modals and logic)
             openAddItemModal: (data) => renderModal('addItem', data),
             openAddLocationModal: (type, parentId) => renderModal('addLocation', { type, parentId }),
             openEditLocationModal: (locationId) => renderModal('editLocation', { locationId }),
@@ -1153,188 +875,85 @@
             openRenameModal: (type, currentVal, parentCat, parentSub) => renderModal('rename', { type, currentVal, parentCat, parentSub }),
             openAddStockModal: (category, subCategory, name) => renderModal('addStock', { category, subCategory, name }),
             openAddItemsModal: (locationId) => renderModal('addItems', { locationId }),
-            openEditItemNameModal: (itemId) => renderModal('editItemName', { itemId }), // New
+            openEditItemNameModal: (itemId) => renderModal('editItemName', { itemId }),
+            // ... (keep file upload, settings modals, utils) ...
             handleFileUpload: (e) => {
                  const file = e.target.files[0];
                  if (!file) return;
-                 
                  Papa.parse(file, {
-                     header: true,
-                     skipEmptyLines: true,
+                     header: true, skipEmptyLines: true,
                      complete: async (results) => {
                          const rows = results.data;
                          if (!rows || rows.length === 0) return;
-                         
                          let added = 0;
                          const batch = writeBatch(db);
-                         
-                         // Expect headers: Equipment ID, Name, Category, Sub-Category, Location, Quantity, Status
                          rows.forEach(row => {
                              const id = row['Equipment ID'] || row['ID'] || `IMP-${Date.now()}-${Math.floor(Math.random()*1000)}`;
-                             
-                             // Skip if exists
                              if (state.inventory.some(i => i.equipmentId === id)) return;
-                             
                              const newItem = {
                                  equipmentId: id,
                                  name: row['Name'] || row['Item Name'] || 'Imported Item',
                                  category: row['Category'] || 'Uncategorized',
                                  subCategory: row['Sub-Category'] || 'General',
                                  condition: row['Condition'] || 'Working',
-                                 locationId: null, // Basic import goes to storage
+                                 locationId: null,
                                  isDisposed: false,
                                  createdAt: new Date().toISOString()
                              };
-                             
                              const ref = doc(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'));
                              batch.set(ref, newItem);
                              added++;
                          });
-                         
-                         if(added > 0) {
-                             await batch.commit();
-                             showToast(`Imported ${added} items successfully`);
-                             app.setActiveTab('storage');
-                         } else {
-                             alert("No new items found or invalid CSV format.");
-                         }
+                         if(added > 0) { await batch.commit(); showToast(`Imported ${added} items successfully`); app.setActiveTab('storage'); } 
+                         else { alert("No new items found or invalid CSV format."); }
                      }
                  });
             },
             triggerImport: () => document.getElementById('csv-upload').click(),
-            
-            // Settings Modals
             openManageCategoryModal: (action, name) => renderModal('manageCategory', { action, name }),
             openManageSubCategoryModal: (action, parentCat, name) => renderModal('manageSubCategory', { action, parentCat, name }),
             openMoveSubCategoryModal: (subName, currentParent) => renderModal('moveSubCategory', { subName, currentParent }),
-
             updateSubCategoryOptions: (category) => {
                 const subSelect = document.getElementById('input-subcategory');
                 subSelect.innerHTML = '<option value="" disabled selected>Select...</option>';
                 const catObj = state.masterData.categories.find(c => c.name === category);
-                if (catObj && catObj.subs) {
-                    catObj.subs.forEach(s => {
-                        const opt = document.createElement('option');
-                        opt.value = s;
-                        opt.innerText = s;
-                        subSelect.appendChild(opt);
-                    });
-                }
+                if (catObj && catObj.subs) { catObj.subs.forEach(s => { const opt = document.createElement('option'); opt.value = s; opt.innerText = s; subSelect.appendChild(opt); }); }
             },
-
-            // Modal Controls
-            closeModal: () => {
-                state.currentModal = null;
-                document.getElementById('modal-container').classList.add('hidden');
-                document.getElementById('modal-content').innerHTML = '';
-            },
-            
-            // Confirm Modal Controls
-            openConfirmModal: (msg, actionFn) => {
-                state.pendingAction = actionFn;
-                document.getElementById('confirm-message').innerText = msg;
-                document.getElementById('confirm-modal').classList.remove('hidden');
-            },
-            closeConfirmModal: () => {
-                state.pendingAction = null;
-                document.getElementById('confirm-modal').classList.add('hidden');
-            },
-            executePendingAction: async () => {
-                if (state.pendingAction) {
-                    await state.pendingAction();
-                }
-                app.closeConfirmModal();
-            },
-
-            handleSearch: (e) => {
-                state.searchTerm = e.target.value;
-                renderStorageList(); 
-            },
-            filterAddItems: (e) => {
-                const term = e.target.value.toLowerCase();
-                const groups = document.querySelectorAll('.add-item-group');
-                groups.forEach(g => {
-                    const text = g.dataset.search.toLowerCase();
-                    g.style.display = text.includes(term) ? 'block' : 'none';
-                });
-            },
-            toggleSelectAll: (checkbox) => {
-                const group = checkbox.closest('.add-item-group');
-                const inputs = group.querySelectorAll('.item-checkbox');
-                inputs.forEach(input => input.checked = checkbox.checked);
-            },
-            generateIdFromSubCategory: (subCategory) => {
-                if (!subCategory) return;
-                let prefix = subCategory.split(' ').map(word => word[0]).join('').toUpperCase();
-                if (prefix.length < 2) prefix = subCategory.substring(0, 2).toUpperCase();
-                
-                const newId = app.generateNextId(prefix);
-                const idInput = document.getElementById('input-equipment-id');
-                if (idInput) idInput.value = newId;
-            },
-
-            // SMART ID GENERATOR: Skips permanently retired IDs
-            generateNextId: (rawPrefix) => {
-                // Remove trailing dash if present to avoid double dash in regex
-                const prefix = rawPrefix.endsWith('-') ? rawPrefix.slice(0, -1) : rawPrefix;
-                
-                const regex = new RegExp(`^${prefix}-(\\d+)$`);
-
-                // 1. Get numbers from active inventory
-                const inventoryNumbers = state.inventory
-                    .filter(i => i.equipmentId && i.equipmentId.match(regex))
-                    .map(i => parseInt(i.equipmentId.match(regex)[1], 10));
-
-                // 2. Get numbers from retired IDs (Pullout deletions)
-                const retiredNumbers = (state.masterData.retiredIds || [])
-                    .filter(id => id.match(regex))
-                    .map(id => parseInt(id.match(regex)[1], 10));
-
-                // 3. Combine into a set of "unavailable" numbers
-                const usedNumbers = new Set([...inventoryNumbers, ...retiredNumbers]);
-
-                // 4. Find the first gap (smallest number starting from 1 that isn't used)
-                let nextNum = 1;
-                while (usedNumbers.has(nextNum)) {
-                    nextNum++;
-                }
-
-                return `${prefix}-${String(nextNum).padStart(4, '0')}`;
-            },
-
-            // --- PDF GENERATION ---
+            closeModal: () => { state.currentModal = null; document.getElementById('modal-container').classList.add('hidden'); document.getElementById('modal-content').innerHTML = ''; },
+            openConfirmModal: (msg, actionFn) => { state.pendingAction = actionFn; document.getElementById('confirm-message').innerText = msg; document.getElementById('confirm-modal').classList.remove('hidden'); },
+            closeConfirmModal: () => { state.pendingAction = null; document.getElementById('confirm-modal').classList.add('hidden'); },
+            executePendingAction: async () => { if (state.pendingAction) { await state.pendingAction(); } app.closeConfirmModal(); },
+            handleSearch: (e) => { state.searchTerm = e.target.value; renderStorageList(); },
+            filterAddItems: (e) => { const term = e.target.value.toLowerCase(); const groups = document.querySelectorAll('.add-item-group'); groups.forEach(g => { const text = g.dataset.search.toLowerCase(); g.style.display = text.includes(term) ? 'block' : 'none'; }); },
+            toggleSelectAll: (checkbox) => { const group = checkbox.closest('.add-item-group'); const inputs = group.querySelectorAll('.item-checkbox'); inputs.forEach(input => input.checked = checkbox.checked); },
+            generateIdFromSubCategory: (subCategory) => { if (!subCategory) return; let prefix = subCategory.split(' ').map(word => word[0]).join('').toUpperCase(); if (prefix.length < 2) prefix = subCategory.substring(0, 2).toUpperCase(); const newId = app.generateNextId(prefix); const idInput = document.getElementById('input-equipment-id'); if (idInput) idInput.value = newId; },
+            generateNextId: (rawPrefix) => { const prefix = rawPrefix.endsWith('-') ? rawPrefix.slice(0, -1) : rawPrefix; const regex = new RegExp(`^${prefix}-(\\d+)$`); const inventoryNumbers = state.inventory.filter(i => i.equipmentId && i.equipmentId.match(regex)).map(i => parseInt(i.equipmentId.match(regex)[1], 10)); const retiredNumbers = (state.masterData.retiredIds || []).filter(id => id.match(regex)).map(id => parseInt(id.match(regex)[1], 10)); const usedNumbers = new Set([...inventoryNumbers, ...retiredNumbers]); let nextNum = 1; while (usedNumbers.has(nextNum)) { nextNum++; } return `${prefix}-${String(nextNum).padStart(4, '0')}`; },
+            // ... (keep PDF) ...
             generatePDF: () => {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF();
                 const now = new Date();
                 const dateStr = formatDatePH(now.toISOString());
-
                 // Corporate Colors
                 const darkBlue = [26, 54, 93]; 
                 const slateGray = [100, 116, 139];
                 const lightGray = [241, 245, 249];
-
                 // --- HEADER ---
                 doc.setFillColor(...darkBlue);
                 doc.rect(0, 0, 210, 40, 'F');
-                
                 doc.setTextColor(255, 255, 255);
                 doc.setFontSize(24);
                 doc.setFont('helvetica', 'bold');
                 doc.text("INVENTORY REPORT", 14, 25);
-                
                 doc.setFontSize(10);
                 doc.setFont('helvetica', 'normal');
                 doc.text(`Generated: ${dateStr}`, 14, 33);
-
                 let yPos = 55;
-
                 // --- SELECTIONS ---
                 const includeSummary = document.getElementById('report-summary').checked;
                 const includeInventory = document.getElementById('report-inventory').checked;
                 const includeLocations = document.getElementById('report-locations').checked;
                 const includeLogs = document.getElementById('report-logs').checked;
-
                 // --- 1. EXECUTIVE SUMMARY ---
                 if (includeSummary) {
                     doc.setTextColor(0, 0, 0);
@@ -1344,629 +963,89 @@
                     doc.setDrawColor(...slateGray);
                     doc.line(14, yPos + 2, 196, yPos + 2);
                     yPos += 15;
-
                     // Metrics
                     const totalItems = state.inventory.filter(i => !i.isDisposed).length;
                     const assigned = state.inventory.filter(i => !i.isDisposed && i.locationId).length;
                     const storage = totalItems - assigned;
                     const disposed = state.inventory.filter(i => i.isDisposed).length;
-                    
-                    // Room Stats
                     const rooms = state.locations.filter(l => l.type === 'room');
                     const vacant = rooms.filter(r => r.status === 'vacant').length;
                     const occupied = rooms.filter(r => r.status === 'occupied').length;
                     const maintenance = rooms.filter(r => r.status === 'maintenance').length;
-
-                    // Top Sub-Categories
                     const subCounts = {};
                     state.inventory.filter(i => !i.isDisposed).forEach(i => {
                         const sub = i.subCategory || 'General';
                         subCounts[sub] = (subCounts[sub] || 0) + 1;
                     });
-                    const topSubs = Object.entries(subCounts)
-                        .sort((a,b) => b[1] - a[1])
-                        .slice(0, 5)
-                        .map(([k,v]) => `${k}: ${v}`)
-                        .join(', ');
-
-                    const summaryData = [
-                        ['Total Active Assets', totalItems, 'Vacant Rooms', vacant],
-                        ['In Storage', storage, 'Occupied Rooms', occupied],
-                        ['Assigned / Deployed', assigned, 'Under Maintenance', maintenance],
-                        ['Disposed / Retired', disposed, 'Top Categories', topSubs]
-                    ];
-
-                    doc.autoTable({
-                        startY: yPos,
-                        body: summaryData,
-                        theme: 'grid',
-                        styles: { fontSize: 9, cellPadding: 4, lineColor: [200, 200, 200] },
-                        columnStyles: {
-                            0: { fontStyle: 'bold', fillColor: lightGray, cellWidth: 40 },
-                            2: { fontStyle: 'bold', fillColor: lightGray, cellWidth: 40 }
-                        },
-                        margin: { left: 14, right: 14 }
-                    });
-                    
+                    const topSubs = Object.entries(subCounts).sort((a,b) => b[1] - a[1]).slice(0, 5).map(([k,v]) => `${k}: ${v}`).join(', ');
+                    const summaryData = [['Total Active Assets', totalItems, 'Vacant Rooms', vacant],['In Storage', storage, 'Occupied Rooms', occupied],['Assigned / Deployed', assigned, 'Under Maintenance', maintenance],['Disposed / Retired', disposed, 'Top Categories', topSubs]];
+                    doc.autoTable({ startY: yPos, body: summaryData, theme: 'grid', styles: { fontSize: 9, cellPadding: 4, lineColor: [200, 200, 200] }, columnStyles: { 0: { fontStyle: 'bold', fillColor: lightGray, cellWidth: 40 }, 2: { fontStyle: 'bold', fillColor: lightGray, cellWidth: 40 } }, margin: { left: 14, right: 14 } });
                     yPos = doc.lastAutoTable.finalY + 20;
                 }
-
                 // --- 2. FULL INVENTORY (Grouped) ---
                 if (includeInventory) {
                     if (yPos > 240) { doc.addPage(); yPos = 20; }
-                    doc.setTextColor(0, 0, 0);
-                    doc.setFontSize(14);
-                    doc.setFont('helvetica', 'bold');
-                    doc.text("FULL INVENTORY LIST", 14, yPos);
-                    doc.line(14, yPos + 2, 196, yPos + 2);
-                    yPos += 10;
-
-                    // Group Items: Category -> Sub-Category -> Items
+                    doc.setTextColor(0, 0, 0); doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.text("FULL INVENTORY LIST", 14, yPos); doc.line(14, yPos + 2, 196, yPos + 2); yPos += 10;
                     const grouped = {};
-                    state.inventory.filter(i => !i.isDisposed).forEach(i => {
-                        if(!grouped[i.category]) grouped[i.category] = {};
-                        if(!grouped[i.category][i.subCategory]) grouped[i.category][i.subCategory] = [];
-                        grouped[i.category][i.subCategory].push(i);
-                    });
-
-                    // Flatten for table, inserting headers
+                    state.inventory.filter(i => !i.isDisposed).forEach(i => { if(!grouped[i.category]) grouped[i.category] = {}; if(!grouped[i.category][i.subCategory]) grouped[i.category][i.subCategory] = []; grouped[i.category][i.subCategory].push(i); });
                     const tableRows = [];
                     Object.keys(grouped).sort().forEach(cat => {
-                        // Category Header Row
                         tableRows.push([{ content: cat.toUpperCase(), colSpan: 5, styles: { fillColor: [226, 232, 240], fontStyle: 'bold', textColor: [0,0,0] } }]);
-                        
                         Object.keys(grouped[cat]).sort().forEach(sub => {
-                            // Sub-Category Header Row
                             tableRows.push([{ content: `   ${sub}`, colSpan: 5, styles: { fillColor: [248, 250, 252], fontStyle: 'bold', textColor: [100,100,100] } }]);
-                            
                             const items = grouped[cat][sub].sort((a,b) => a.equipmentId.localeCompare(b.equipmentId, undefined, {numeric: true}));
-                            items.forEach(item => {
-                                const locName = item.locationId ? getLocationNamePlain(item.locationId) : 'Storage';
-                                tableRows.push([
-                                    item.equipmentId,
-                                    item.name,
-                                    locName,
-                                    item.condition,
-                                    item.quantity || 1
-                                ]);
-                            });
+                            items.forEach(item => { const locName = item.locationId ? getLocationNamePlain(item.locationId) : 'Storage'; tableRows.push([ item.equipmentId, item.name, locName, item.condition, item.quantity || 1 ]); });
                         });
                     });
-
-                    doc.autoTable({
-                        startY: yPos,
-                        head: [['ID', 'Item Name', 'Location', 'Condition', 'Qty']],
-                        body: tableRows,
-                        theme: 'plain',
-                        headStyles: { fillColor: darkBlue, textColor: 255 },
-                        styles: { fontSize: 8, cellPadding: 2 },
-                        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 30 } },
-                        margin: { left: 14, right: 14 }
-                    });
+                    doc.autoTable({ startY: yPos, head: [['ID', 'Item Name', 'Location', 'Condition', 'Qty']], body: tableRows, theme: 'plain', headStyles: { fillColor: darkBlue, textColor: 255 }, styles: { fontSize: 8, cellPadding: 2 }, columnStyles: { 0: { fontStyle: 'bold', cellWidth: 30 } }, margin: { left: 14, right: 14 } });
                     yPos = doc.lastAutoTable.finalY + 20;
                 }
-
                 // --- 3. LOCATION STATUS (Grouped by Floor & Sorted) ---
                 if (includeLocations) {
                     if (yPos > 250) { doc.addPage(); yPos = 20; }
-                    doc.setTextColor(0, 0, 0);
-                    doc.setFontSize(14);
-                    doc.setFont('helvetica', 'bold');
-                    doc.text("LOCATION STATUS REPORT", 14, yPos);
-                    doc.line(14, yPos + 2, 196, yPos + 2);
-                    yPos += 10;
-
+                    doc.setTextColor(0, 0, 0); doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.text("LOCATION STATUS REPORT", 14, yPos); doc.line(14, yPos + 2, 196, yPos + 2); yPos += 10;
                     const floors = state.locations.filter(l => l.type === 'floor').sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
                     const locRows = [];
-
                     floors.forEach(floor => {
-                        // Floor Header
                         locRows.push([{ content: floor.name.toUpperCase(), colSpan: 4, styles: { fillColor: [226, 232, 240], fontStyle: 'bold', textColor: [0,0,0] } }]);
-                        
-                        // Get Rooms for this floor
-                        const rooms = state.locations.filter(l => l.type === 'room' && l.parentId === floor.id)
-                            .sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
-
-                        if (rooms.length === 0) {
-                             locRows.push([{ content: 'No rooms configured.', colSpan: 4, styles: { fontStyle: 'italic', textColor: [150,150,150] } }]);
-                        }
-
-                        rooms.forEach(l => {
-                             const roomItems = state.inventory.filter(i => i.locationId === l.id);
-                             const subCounts = {};
-                             roomItems.forEach(i => {
-                                const sub = i.subCategory || 'General';
-                                subCounts[sub] = (subCounts[sub] || 0) + 1;
-                             });
-                             const assetDetails = Object.keys(subCounts).length > 0 
-                                            ? Object.entries(subCounts).map(([k,v]) => `${k}: ${v}`).join(', ') 
-                                            : 'Empty';
-
-                             locRows.push([
-                                l.customId || 'N/A', 
-                                l.name, 
-                                l.status ? l.status.toUpperCase() : 'UNKNOWN', 
-                                assetDetails
-                             ]);
-                        });
+                        const rooms = state.locations.filter(l => l.type === 'room' && l.parentId === floor.id).sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+                        if (rooms.length === 0) { locRows.push([{ content: 'No rooms configured.', colSpan: 4, styles: { fontStyle: 'italic', textColor: [150,150,150] } }]); }
+                        rooms.forEach(l => { const roomItems = state.inventory.filter(i => i.locationId === l.id); const subCounts = {}; roomItems.forEach(i => { const sub = i.subCategory || 'General'; subCounts[sub] = (subCounts[sub] || 0) + 1; }); const assetDetails = Object.keys(subCounts).length > 0 ? Object.entries(subCounts).map(([k,v]) => `${k}: ${v}`).join(', ') : 'Empty'; locRows.push([ l.customId || 'N/A', l.name, l.status ? l.status.toUpperCase() : 'UNKNOWN', assetDetails ]); });
                     });
-
-                    doc.autoTable({
-                        startY: yPos,
-                        head: [['Room ID', 'Name', 'Status', 'Assets Breakdown']],
-                        body: locRows,
-                        theme: 'grid',
-                        headStyles: { fillColor: darkBlue, textColor: 255 },
-                        styles: { fontSize: 9, cellPadding: 3, valign: 'middle' },
-                        columnStyles: { 3: { fontSize: 8 } },
-                        margin: { left: 14, right: 14 }
-                    });
+                    doc.autoTable({ startY: yPos, head: [['Room ID', 'Name', 'Status', 'Assets Breakdown']], body: locRows, theme: 'grid', headStyles: { fillColor: darkBlue, textColor: 255 }, styles: { fontSize: 9, cellPadding: 3, valign: 'middle' }, columnStyles: { 3: { fontSize: 8 } }, margin: { left: 14, right: 14 } });
                     yPos = doc.lastAutoTable.finalY + 20;
                 }
-
                 // --- 4. ACTIVITY LOGS ---
                 if (includeLogs) {
-                    doc.addPage();
-                    yPos = 20;
-                    doc.setTextColor(0, 0, 0);
-                    doc.setFontSize(14);
-                    doc.setFont('helvetica', 'bold');
-                    doc.text("SYSTEM ACTIVITY LOGS", 14, yPos);
-                    doc.line(14, yPos + 2, 196, yPos + 2);
-                    yPos += 10;
-
-                    const logRows = state.logs.slice(0, 50).map(l => {
-                        return [formatDatePH(l.timestamp), l.action, l.details];
-                    });
-
-                    doc.autoTable({
-                        startY: yPos,
-                        head: [['Timestamp', 'Action', 'Details']],
-                        body: logRows,
-                        theme: 'striped',
-                        headStyles: { fillColor: slateGray, textColor: 255 },
-                        styles: { fontSize: 8, cellPadding: 2 },
-                        columnStyles: { 0: { cellWidth: 40 }, 1: { fontStyle: 'bold', cellWidth: 40 } },
-                        margin: { left: 14, right: 14 }
-                    });
+                    doc.addPage(); yPos = 20; doc.setTextColor(0, 0, 0); doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.text("SYSTEM ACTIVITY LOGS", 14, yPos); doc.line(14, yPos + 2, 196, yPos + 2); yPos += 10;
+                    const logRows = state.logs.slice(0, 50).map(l => { return [formatDatePH(l.timestamp), l.action, l.details]; });
+                    doc.autoTable({ startY: yPos, head: [['Timestamp', 'Action', 'Details']], body: logRows, theme: 'striped', headStyles: { fillColor: slateGray, textColor: 255 }, styles: { fontSize: 8, cellPadding: 2 }, columnStyles: { 0: { cellWidth: 40 }, 1: { fontStyle: 'bold', cellWidth: 40 } }, margin: { left: 14, right: 14 } });
                 }
-
                 // --- FOOTER (Page Numbers) ---
-                const pageCount = doc.internal.getNumberOfPages();
-                for(let i = 1; i <= pageCount; i++) {
-                    doc.setPage(i);
-                    doc.setFontSize(8);
-                    doc.setTextColor(150);
-                    doc.text(`Page ${i} of ${pageCount}`, 196, 285, { align: 'right' });
-                }
-
+                const pageCount = doc.internal.getNumberOfPages(); for(let i = 1; i <= pageCount; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150); doc.text(`Page ${i} of ${pageCount}`, 196, 285, { align: 'right' }); }
                 doc.save(`Equipment_Report_${now.toISOString().slice(0,10)}.pdf`);
                 showToast("PDF Report Generated");
             },
-
-            submitAddItem: async (e) => {
-                e.preventDefault();
-                const form = e.target;
-                const quantity = parseInt(form.quantity.value) || 1;
-                let currentIdString = form.equipmentId.value.trim().toUpperCase(); 
-
-                // Regex to split "CAM-001" into "CAM-" and "001" or "CAM" and "001"
-                const match = currentIdString.match(/^(.*?)(\d+)$/);
-                
-                // Fallback for non-numeric IDs or if no number found
-                if (!match) {
-                    if (quantity > 1) {
-                        alert("To add multiple items, the ID must end with a number.");
-                        return;
-                    }
-                    // Simple check for single item
-                    if (state.inventory.some(i => i.equipmentId === currentIdString) || (state.masterData.retiredIds || []).includes(currentIdString)) {
-                         alert(`ID "${currentIdString}" is unavailable (Active or Retired).`);
-                         return;
-                    }
-                    
-                    // Create single item logic
-                    try {
-                        const ref = doc(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'));
-                        await setDoc(ref, {
-                            equipmentId: currentIdString,
-                            name: form.name.value,
-                            category: form.category.value,
-                            subCategory: form.subCategory.value,
-                            condition: 'Working',
-                            isDisposed: false,
-                            quantity: 1, 
-                            locationId: null,
-                            createdAt: new Date().toISOString()
-                        });
-                        await logActivity('Item Added', `Added 1 item: ${currentIdString} - ${form.name.value}`);
-                        app.closeModal();
-                        showToast("Item Added");
-                    } catch (err) { console.error(err); showToast("Error saving item.", 'error'); }
-                    return;
-                }
-
-                // Logic for numbered IDs (single or bulk)
-                const prefix = match[1]; 
-                let nextNum = parseInt(match[2], 10); 
-                const padding = match[2].length; 
-
-                const itemsToCreate = [];
-                let createdCount = 0;
-                let attempts = 0;
-                const maxAttempts = quantity + 500; // Safety limit
-
-                // Smart Loop: Find valid IDs skipping existing and retired
-                while (createdCount < quantity && attempts < maxAttempts) {
-                    const candidateId = `${prefix}${String(nextNum).padStart(padding, '0')}`;
-                    
-                    const existsInInventory = state.inventory.some(i => i.equipmentId === candidateId);
-                    const isRetired = (state.masterData.retiredIds || []).includes(candidateId);
-
-                    if (!existsInInventory && !isRetired) {
-                        itemsToCreate.push({
-                            equipmentId: candidateId,
-                            name: form.name.value,
-                            category: form.category.value,
-                            subCategory: form.subCategory.value,
-                            condition: 'Working',
-                            isDisposed: false,
-                            quantity: 1, 
-                            locationId: null,
-                            createdAt: new Date().toISOString()
-                        });
-                        createdCount++;
-                    }
-                    nextNum++;
-                    attempts++;
-                }
-
-                if (createdCount === 0) {
-                    alert("Could not generate any valid IDs. Please check if IDs are exhausted.");
-                    return;
-                }
-
-                if (createdCount < quantity) {
-                    if(!confirm(`Could only generate ${createdCount} valid IDs out of ${quantity} requested. Continue?`)) return;
-                }
-
-                try {
-                    const batch = writeBatch(db);
-                    itemsToCreate.forEach(item => {
-                        const ref = doc(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'));
-                        batch.set(ref, item);
-                    });
-                    await batch.commit();
-                    
-                    // Improved Log message
-                    const rangeMsg = createdCount > 1 
-                        ? `from ${itemsToCreate[0].equipmentId} to ${itemsToCreate[itemsToCreate.length-1].equipmentId}`
-                        : itemsToCreate[0].equipmentId;
-                        
-                    await logActivity('Item Added', `Added ${createdCount} items (${form.name.value}) ${rangeMsg}`);
-                    app.closeModal();
-                    showToast(`${createdCount} Items Added`);
-                } catch (err) { console.error(err); showToast("Error saving items.", 'error'); }
-            },
-
-            submitEditItemName: async (e, oldName, category, subCategory) => {
-                e.preventDefault();
-                const newName = e.target.newName.value.trim();
-                if (!newName || newName === oldName) {
-                    app.closeModal();
-                    return;
-                }
-                
-                // Find all items with this name in this subcategory
-                const itemsToUpdate = state.inventory.filter(i => 
-                    i.name === oldName && 
-                    i.category === category && 
-                    i.subCategory === subCategory
-                );
-                
-                if (itemsToUpdate.length === 0) return;
-                
-                try {
-                    const batch = writeBatch(db);
-                    itemsToUpdate.forEach(item => {
-                        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id);
-                        batch.update(ref, { name: newName });
-                    });
-                    
-                    await batch.commit();
-                    await logActivity('Item Renamed', `Renamed "${oldName}" to "${newName}" (${itemsToUpdate.length} items)`);
-                    app.closeModal();
-                    showToast("Items Renamed");
-                } catch (err) { console.error(err); showToast("Error renaming items", 'error'); }
-            },
-
-            submitSwap: async (sourceId, targetId, swapType) => {
-                if (!targetId || sourceId === targetId) return;
-                try {
-                    const batch = writeBatch(db);
-                    
-                    const sourceItems = state.inventory.filter(i => i.locationId === sourceId);
-                    const targetItems = state.inventory.filter(i => i.locationId === targetId);
-
-                    sourceItems.forEach(item => {
-                        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id);
-                        batch.update(ref, { locationId: targetId });
-                    });
-                    targetItems.forEach(item => {
-                        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id);
-                        batch.update(ref, { locationId: sourceId });
-                    });
-
-                    const sourceName = getLocationNamePlain(sourceId);
-                    const targetName = getLocationNamePlain(targetId);
-
-                    if (swapType === 'room') {
-                        const sourceLoc = state.locations.find(l => l.id === sourceId);
-                        const targetLoc = state.locations.find(l => l.id === targetId);
-                        
-                        if (sourceLoc && targetLoc) {
-                            const sourceRef = doc(db, 'artifacts', appId, 'public', 'data', 'locations', sourceId);
-                            const targetRef = doc(db, 'artifacts', appId, 'public', 'data', 'locations', targetId);
-                            batch.update(sourceRef, { name: targetLoc.name, status: targetLoc.status || 'vacant' });
-                            batch.update(targetRef, { name: sourceLoc.name, status: sourceLoc.status || 'vacant' });
-                        }
-                    }
-                    await batch.commit();
-                    await logActivity('Swap Executed', `Swapped ${swapType} between ${sourceName} and ${targetName}`);
-                    app.closeModal();
-                    showToast("Swap Complete");
-                } catch (err) { console.error(err); showToast("Failed to swap.", 'error'); }
-            },
-
-            updateRoomStatus: async (locationId, newStatus) => {
-                try {
-                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'locations', locationId);
-                    await updateDoc(ref, { status: newStatus });
-                    const locName = getLocationNamePlain(locationId);
-                    await logActivity('Status Changed', `${locName} status set to ${newStatus}`);
-                } catch (err) { console.error(err); showToast("Error updating status", 'error'); }
-            },
-
-            refreshModal: () => {
-                if (state.currentModal && state.currentModal.type === 'locationDetail') {
-                    renderModal(state.currentModal.type, state.currentModal.data);
-                }
-            },
             
-            toggleCondition: async (id, currentCondition) => {
-                const newCondition = currentCondition === 'Working' ? 'Defective' : 'Working';
-                try {
-                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id);
-                    await updateDoc(ref, { condition: newCondition });
-                    showToast(`Condition set to ${newCondition}`);
-                } catch (e) {
-                    console.error(e);
-                    showToast('Error updating condition', 'error');
-                }
-            },
-            
-            deleteItem: (id, name, equipId, permanent) => {
-                const doDelete = async () => {
-                    try {
-                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id));
-                        if (permanent) {
-                             const retiredRef = doc(db, 'artifacts', appId, 'public', 'data', 'global_settings', 'masterData');
-                             const currentRetired = state.masterData.retiredIds || [];
-                             if (!currentRetired.includes(equipId)) {
-                                 await updateDoc(retiredRef, { retiredIds: [...currentRetired, equipId] });
-                             }
-                        }
-                        await logActivity('Item Deleted', `Deleted ${name} (${equipId}) ${permanent ? 'permanently' : ''}`);
-                        showToast('Item deleted');
-                    } catch(e) { console.error(e); showToast('Delete failed', 'error'); }
-                };
-                app.openConfirmModal(`Are you sure you want to delete ${name}?`, doDelete);
-            },
-            
-            toggleDisposal: async (id, name, equipId, restore) => {
-                 try {
-                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id);
-                    await updateDoc(ref, { isDisposed: !restore, locationId: null }); 
-                    await logActivity('Item Status', `${restore ? 'Restored' : 'Disposed'} ${name} (${equipId})`);
-                    showToast(restore ? 'Item Restored' : 'Item Disposed');
-                 } catch(e) { console.error(e); showToast('Action failed', 'error'); }
-            },
-            
-            submitMoveItem: async (itemId, locationId, name, equipId) => {
-                 try {
-                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', itemId);
-                    if (locationId === 'PULLOUT') {
-                        await updateDoc(ref, { isDisposed: true, locationId: null });
-                        await logActivity('Item Moved', `Moved ${name} (${equipId}) to Pullout`);
-                    } else {
-                        const finalLoc = locationId === "" ? null : locationId;
-                        await updateDoc(ref, { locationId: finalLoc, isDisposed: false });
-                        const locName = getLocationNamePlain(finalLoc);
-                        await logActivity('Item Moved', `Moved ${name} (${equipId}) to ${locName}`);
-                    }
-                    app.closeModal();
-                    showToast('Item moved');
-                 } catch(e) { console.error(e); showToast('Move failed', 'error'); }
-            },
-            
-            submitAddLocation: async (e) => {
-                e.preventDefault();
-                const form = e.target;
-                try {
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'locations'), {
-                        type: form.type.value,
-                        parentId: form.parentId.value || null,
-                        name: form.name.value,
-                        customId: form.customId ? form.customId.value : null,
-                        status: form.status ? form.status.value : null,
-                        createdAt: new Date().toISOString()
-                    });
-                    await logActivity('Location Created', `Created ${form.type.value}: ${form.name.value}`);
-                    app.closeModal();
-                    showToast('Location created');
-                } catch(e) { console.error(e); showToast('Error creating location', 'error'); }
-            },
-            
-            submitEditLocation: async (e, id) => {
-                 e.preventDefault();
-                 const form = e.target;
-                 try {
-                     const updateData = { name: form.name.value };
-                     if (form.customId) updateData.customId = form.customId.value;
-                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', id), updateData);
-                     await logActivity('Location Updated', `Updated location: ${form.name.value}`);
-                     app.closeModal();
-                     showToast('Location updated');
-                 } catch(e) { console.error(e); showToast('Error updating location', 'error'); }
-            },
-            
-            deleteLocation: (id) => {
-                 const doDelete = async () => {
-                     try {
-                         const items = state.inventory.filter(i => i.locationId === id);
-                         const batch = writeBatch(db);
-                         items.forEach(i => {
-                             batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { locationId: null });
-                         });
-                         batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'locations', id));
-                         await batch.commit();
-                         await logActivity('Location Deleted', `Deleted location ID: ${id}`);
-                         app.closeModal();
-                         showToast('Location deleted');
-                     } catch(e) { console.error(e); showToast('Delete failed', 'error'); }
-                 };
-                 app.openConfirmModal("Delete this location? Items will be moved to Storage.", doDelete);
-            },
-            
-            submitAddItems: async (e, locationId) => {
-                e.preventDefault();
-                const form = e.target;
-                const checkboxes = form.querySelectorAll('input[name="selectedItems"]:checked');
-                if (checkboxes.length === 0) return;
-                
-                try {
-                    const batch = writeBatch(db);
-                    checkboxes.forEach(cb => {
-                        batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', cb.value), { locationId: locationId || null });
-                    });
-                    await batch.commit();
-                    await logActivity('Items Moved', `Moved ${checkboxes.length} items to ${getLocationNamePlain(locationId)}`);
-                    app.closeModal();
-                    showToast(`${checkboxes.length} items moved`);
-                } catch(e) { console.error(e); showToast('Move failed', 'error'); }
-            },
-            
-            submitManageCategory: async (e, action, oldName) => {
-                e.preventDefault();
-                const newName = e.target.name.value.trim();
-                if(!newName) return;
-                
-                let cats = [...(state.masterData.categories || [])];
-                
-                if (action === 'add') {
-                    if(cats.some(c => c.name === newName)) return alert('Category exists');
-                    cats.push({ name: newName, subs: [] });
-                } else if (action === 'rename') {
-                    const idx = cats.findIndex(c => c.name === oldName);
-                    if(idx === -1) return;
-                    cats[idx].name = newName;
-                    
-                    const batch = writeBatch(db);
-                    const items = state.inventory.filter(i => i.category === oldName);
-                    items.forEach(i => {
-                        batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { category: newName });
-                    });
-                    await batch.commit();
-                }
-                state.masterData.categories = cats;
-                await saveMasterData();
-                app.closeModal();
-                showToast('Category updated');
-            },
-            
-            submitManageSubCategory: async (e, action, parentCat, oldName) => {
-                 e.preventDefault();
-                 const newName = e.target.name.value.trim();
-                 if(!newName) return;
-                 
-                 let cats = [...(state.masterData.categories || [])];
-                 const catIdx = cats.findIndex(c => c.name === parentCat);
-                 if(catIdx === -1) return;
-                 
-                 let subs = cats[catIdx].subs || [];
-                 
-                 if(action === 'add') {
-                     if(subs.includes(newName)) return alert('Sub-category exists');
-                     subs.push(newName);
-                 } else if (action === 'rename') {
-                     const idx = subs.indexOf(oldName);
-                     if(idx === -1) return;
-                     subs[idx] = newName;
-                     
-                     const batch = writeBatch(db);
-                     const items = state.inventory.filter(i => i.category === parentCat && i.subCategory === oldName);
-                     items.forEach(i => {
-                         batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { subCategory: newName });
-                     });
-                     await batch.commit();
-                 }
-                 cats[catIdx].subs = subs;
-                 state.masterData.categories = cats;
-                 await saveMasterData();
-                 app.closeModal();
-                 showToast('Sub-category updated');
-            },
-            
-            submitMoveSubCategory: async (e, subName, currentParent) => {
-                e.preventDefault();
-                const newParent = e.target.newParent.value;
-                if(!newParent || newParent === currentParent) return;
-
-                let cats = [...(state.masterData.categories || [])];
-                
-                const oldCatIdx = cats.findIndex(c => c.name === currentParent);
-                if(oldCatIdx !== -1) {
-                    cats[oldCatIdx].subs = cats[oldCatIdx].subs.filter(s => s !== subName);
-                }
-                
-                const newCatIdx = cats.findIndex(c => c.name === newParent);
-                if(newCatIdx !== -1) {
-                    if(!cats[newCatIdx].subs) cats[newCatIdx].subs = [];
-                    if(!cats[newCatIdx].subs.includes(subName)) cats[newCatIdx].subs.push(subName);
-                }
-                
-                const batch = writeBatch(db);
-                const items = state.inventory.filter(i => i.category === currentParent && i.subCategory === subName);
-                items.forEach(i => {
-                    batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { category: newParent });
-                });
-                await batch.commit();
-                
-                state.masterData.categories = cats;
-                await saveMasterData();
-                app.closeModal();
-                showToast('Sub-category moved');
-            },
-            
-            deleteMasterCategory: async (name) => {
-                if(!confirm(`Delete category "${name}"? Items will become Uncategorized.`)) return;
-                let cats = (state.masterData.categories || []).filter(c => c.name !== name);
-                state.masterData.categories = cats;
-                await saveMasterData();
-                 showToast('Category deleted');
-            },
-            
-            deleteMasterSubCategory: async (catName, subName) => {
-                if(!confirm(`Delete sub-category "${subName}"?`)) return;
-                let cats = [...(state.masterData.categories || [])];
-                const idx = cats.findIndex(c => c.name === catName);
-                if(idx !== -1) {
-                    cats[idx].subs = cats[idx].subs.filter(s => s !== subName);
-                    state.masterData.categories = cats;
-                    await saveMasterData();
-                    showToast('Sub-category deleted');
-                }
-            }
+            // ... (rest of logic: submitAddItem, etc. unchanged except logActivity call is centralized) ...
+            submitAddItem: async (e) => { e.preventDefault(); const form = e.target; const quantity = parseInt(form.quantity.value) || 1; let currentIdString = form.equipmentId.value.trim().toUpperCase(); const match = currentIdString.match(/^(.*?)(\d+)$/); if (!match) { if (quantity > 1) { alert("To add multiple items, the ID must end with a number."); return; } if (state.inventory.some(i => i.equipmentId === currentIdString) || (state.masterData.retiredIds || []).includes(currentIdString)) { alert(`ID "${currentIdString}" is unavailable (Active or Retired).`); return; } try { await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'inventory')), { equipmentId: currentIdString, name: form.name.value, category: form.category.value, subCategory: form.subCategory.value, condition: 'Working', isDisposed: false, quantity: 1, locationId: null, createdAt: new Date().toISOString() }); await logActivity('Item Added', `Added 1 item: ${currentIdString} - ${form.name.value}`); app.closeModal(); showToast("Item Added"); } catch (err) { console.error(err); showToast("Error saving item.", 'error'); } return; } const prefix = match[1]; let nextNum = parseInt(match[2], 10); const padding = match[2].length; const itemsToCreate = []; let createdCount = 0; let attempts = 0; const maxAttempts = quantity + 500; while (createdCount < quantity && attempts < maxAttempts) { const candidateId = `${prefix}${String(nextNum).padStart(padding, '0')}`; const existsInInventory = state.inventory.some(i => i.equipmentId === candidateId); const isRetired = (state.masterData.retiredIds || []).includes(candidateId); if (!existsInInventory && !isRetired) { itemsToCreate.push({ equipmentId: candidateId, name: form.name.value, category: form.category.value, subCategory: form.subCategory.value, condition: 'Working', isDisposed: false, quantity: 1, locationId: null, createdAt: new Date().toISOString() }); createdCount++; } nextNum++; attempts++; } if (createdCount === 0) { alert("Could not generate any valid IDs. Please check if IDs are exhausted."); return; } if (createdCount < quantity) { if(!confirm(`Could only generate ${createdCount} valid IDs out of ${quantity} requested. Continue?`)) return; } try { const batch = writeBatch(db); itemsToCreate.forEach(item => { const ref = doc(collection(db, 'artifacts', appId, 'public', 'data', 'inventory')); batch.set(ref, item); }); await batch.commit(); const rangeMsg = createdCount > 1 ? `from ${itemsToCreate[0].equipmentId} to ${itemsToCreate[itemsToCreate.length-1].equipmentId}` : itemsToCreate[0].equipmentId; await logActivity('Item Added', `Added ${createdCount} items (${form.name.value}) ${rangeMsg}`); app.closeModal(); showToast(`${createdCount} Items Added`); } catch (err) { console.error(err); showToast("Error saving items.", 'error'); } },
+            submitEditItemName: async (e, oldName, category, subCategory) => { e.preventDefault(); const newName = e.target.newName.value.trim(); if (!newName || newName === oldName) { app.closeModal(); return; } const itemsToUpdate = state.inventory.filter(i => i.name === oldName && i.category === category && i.subCategory === subCategory); if (itemsToUpdate.length === 0) return; try { const batch = writeBatch(db); itemsToUpdate.forEach(item => { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id); batch.update(ref, { name: newName }); }); await batch.commit(); await logActivity('Item Renamed', `Renamed "${oldName}" to "${newName}" (${itemsToUpdate.length} items)`); app.closeModal(); showToast("Items Renamed"); } catch (err) { console.error(err); showToast("Error renaming items", 'error'); } },
+            submitSwap: async (sourceId, targetId, swapType) => { if (!targetId || sourceId === targetId) return; try { const batch = writeBatch(db); const sourceItems = state.inventory.filter(i => i.locationId === sourceId); const targetItems = state.inventory.filter(i => i.locationId === targetId); sourceItems.forEach(item => { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id); batch.update(ref, { locationId: targetId }); }); targetItems.forEach(item => { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id); batch.update(ref, { locationId: sourceId }); }); const sourceName = getLocationNamePlain(sourceId); const targetName = getLocationNamePlain(targetId); if (swapType === 'room') { const sourceLoc = state.locations.find(l => l.id === sourceId); const targetLoc = state.locations.find(l => l.id === targetId); if (sourceLoc && targetLoc) { const sourceRef = doc(db, 'artifacts', appId, 'public', 'data', 'locations', sourceId); const targetRef = doc(db, 'artifacts', appId, 'public', 'data', 'locations', targetId); batch.update(sourceRef, { name: targetLoc.name, status: targetLoc.status || 'vacant' }); batch.update(targetRef, { name: sourceLoc.name, status: sourceLoc.status || 'vacant' }); } } await batch.commit(); await logActivity('Swap Executed', `Swapped ${swapType} between ${sourceName} and ${targetName}`); app.closeModal(); showToast("Swap Complete"); } catch (err) { console.error(err); showToast("Failed to swap.", 'error'); } },
+            updateRoomStatus: async (locationId, newStatus) => { try { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'locations', locationId); await updateDoc(ref, { status: newStatus }); const locName = getLocationNamePlain(locationId); await logActivity('Status Changed', `${locName} status set to ${newStatus}`); } catch (err) { console.error(err); showToast("Error updating status", 'error'); } },
+            refreshModal: () => { if (state.currentModal && state.currentModal.type === 'locationDetail') { renderModal(state.currentModal.type, state.currentModal.data); } },
+            toggleCondition: async (id, currentCondition) => { const newCondition = currentCondition === 'Working' ? 'Defective' : 'Working'; try { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id); await updateDoc(ref, { condition: newCondition }); showToast(`Condition set to ${newCondition}`); } catch (e) { console.error(e); showToast('Error updating condition', 'error'); } },
+            deleteItem: (id, name, equipId, permanent) => { const doDelete = async () => { try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id)); if (permanent) { const retiredRef = doc(db, 'artifacts', appId, 'public', 'data', 'global_settings', 'masterData'); const currentRetired = state.masterData.retiredIds || []; if (!currentRetired.includes(equipId)) { await updateDoc(retiredRef, { retiredIds: [...currentRetired, equipId] }); } } await logActivity('Item Deleted', `Deleted ${name} (${equipId}) ${permanent ? 'permanently' : ''}`); showToast('Item deleted'); } catch(e) { console.error(e); showToast('Delete failed', 'error'); } }; app.openConfirmModal(`Are you sure you want to delete ${name}?`, doDelete); },
+            toggleDisposal: async (id, name, equipId, restore) => { try { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id); await updateDoc(ref, { isDisposed: !restore, locationId: null }); await logActivity('Item Status', `${restore ? 'Restored' : 'Disposed'} ${name} (${equipId})`); showToast(restore ? 'Item Restored' : 'Item Disposed'); } catch(e) { console.error(e); showToast('Action failed', 'error'); } },
+            submitMoveItem: async (itemId, locationId, name, equipId) => { try { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', itemId); if (locationId === 'PULLOUT') { await updateDoc(ref, { isDisposed: true, locationId: null }); await logActivity('Item Moved', `Moved ${name} (${equipId}) to Pullout`); } else { const finalLoc = locationId === "" ? null : locationId; await updateDoc(ref, { locationId: finalLoc, isDisposed: false }); const locName = getLocationNamePlain(finalLoc); await logActivity('Item Moved', `Moved ${name} (${equipId}) to ${locName}`); } app.closeModal(); showToast('Item moved'); } catch(e) { console.error(e); showToast('Move failed', 'error'); } },
+            submitAddLocation: async (e) => { e.preventDefault(); const form = e.target; try { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'locations'), { type: form.type.value, parentId: form.parentId.value || null, name: form.name.value, customId: form.customId ? form.customId.value : null, status: form.status ? form.status.value : null, createdAt: new Date().toISOString() }); await logActivity('Location Created', `Created ${form.type.value}: ${form.name.value}`); app.closeModal(); showToast('Location created'); } catch(e) { console.error(e); showToast('Error creating location', 'error'); } },
+            submitEditLocation: async (e, id) => { e.preventDefault(); const form = e.target; try { const updateData = { name: form.name.value }; if (form.customId) updateData.customId = form.customId.value; await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', id), updateData); await logActivity('Location Updated', `Updated location: ${form.name.value}`); app.closeModal(); showToast('Location updated'); } catch(e) { console.error(e); showToast('Error updating location', 'error'); } },
+            deleteLocation: (id) => { const doDelete = async () => { try { const items = state.inventory.filter(i => i.locationId === id); const batch = writeBatch(db); items.forEach(i => { batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { locationId: null }); }); batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'locations', id)); await batch.commit(); await logActivity('Location Deleted', `Deleted location ID: ${id}`); app.closeModal(); showToast('Location deleted'); } catch(e) { console.error(e); showToast('Delete failed', 'error'); } }; app.openConfirmModal("Delete this location? Items will be moved to Storage.", doDelete); },
+            submitAddItems: async (e, locationId) => { e.preventDefault(); const form = e.target; const checkboxes = form.querySelectorAll('input[name="selectedItems"]:checked'); if (checkboxes.length === 0) return; try { const batch = writeBatch(db); checkboxes.forEach(cb => { batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', cb.value), { locationId: locationId || null }); }); await batch.commit(); await logActivity('Items Moved', `Moved ${checkboxes.length} items to ${getLocationNamePlain(locationId)}`); app.closeModal(); showToast(`${checkboxes.length} items moved`); } catch(e) { console.error(e); showToast('Move failed', 'error'); } },
+            submitManageCategory: async (e, action, oldName) => { e.preventDefault(); const newName = e.target.name.value.trim(); if(!newName) return; let cats = [...(state.masterData.categories || [])]; if (action === 'add') { if(cats.some(c => c.name === newName)) return alert('Category exists'); cats.push({ name: newName, subs: [] }); } else if (action === 'rename') { const idx = cats.findIndex(c => c.name === oldName); if(idx === -1) return; cats[idx].name = newName; const batch = writeBatch(db); const items = state.inventory.filter(i => i.category === oldName); items.forEach(i => { batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { category: newName }); }); await batch.commit(); } state.masterData.categories = cats; await saveMasterData(); app.closeModal(); showToast('Category updated'); },
+            submitManageSubCategory: async (e, action, parentCat, oldName) => { e.preventDefault(); const newName = e.target.name.value.trim(); if(!newName) return; let cats = [...(state.masterData.categories || [])]; const catIdx = cats.findIndex(c => c.name === parentCat); if(catIdx === -1) return; let subs = cats[catIdx].subs || []; if(action === 'add') { if(subs.includes(newName)) return alert('Sub-category exists'); subs.push(newName); } else if (action === 'rename') { const idx = subs.indexOf(oldName); if(idx === -1) return; subs[idx] = newName; const batch = writeBatch(db); const items = state.inventory.filter(i => i.category === parentCat && i.subCategory === oldName); items.forEach(i => { batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { subCategory: newName }); }); await batch.commit(); } cats[catIdx].subs = subs; state.masterData.categories = cats; await saveMasterData(); app.closeModal(); showToast('Sub-category updated'); },
+            submitMoveSubCategory: async (e, subName, currentParent) => { e.preventDefault(); const newParent = e.target.newParent.value; if(!newParent || newParent === currentParent) return; let cats = [...(state.masterData.categories || [])]; const oldCatIdx = cats.findIndex(c => c.name === currentParent); if(oldCatIdx !== -1) { cats[oldCatIdx].subs = cats[oldCatIdx].subs.filter(s => s !== subName); } const newCatIdx = cats.findIndex(c => c.name === newParent); if(newCatIdx !== -1) { if(!cats[newCatIdx].subs) cats[newCatIdx].subs = []; if(!cats[newCatIdx].subs.includes(subName)) cats[newCatIdx].subs.push(subName); } const batch = writeBatch(db); const items = state.inventory.filter(i => i.category === currentParent && i.subCategory === subName); items.forEach(i => { batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { category: newParent }); }); await batch.commit(); state.masterData.categories = cats; await saveMasterData(); app.closeModal(); showToast('Sub-category moved'); },
+            deleteMasterCategory: async (name) => { if(!confirm(`Delete category "${name}"? Items will become Uncategorized.`)) return; let cats = (state.masterData.categories || []).filter(c => c.name !== name); state.masterData.categories = cats; await saveMasterData(); showToast('Category deleted'); },
+            deleteMasterSubCategory: async (catName, subName) => { if(!confirm(`Delete sub-category "${subName}"?`)) return; let cats = [...(state.masterData.categories || [])]; const idx = cats.findIndex(c => c.name === catName); if(idx !== -1) { cats[idx].subs = cats[idx].subs.filter(s => s !== subName); state.masterData.categories = cats; await saveMasterData(); showToast('Sub-category deleted'); } }
         };
 
         // --- Render Helpers ---
@@ -2040,39 +1119,44 @@
 
         // Initialization
         async function init() {
-            try {
-                // Check if using custom config
-                const isCustom = customConfig && customConfig.apiKey;
-                
-                // If custom config is present, ignore the Canvas token and go straight to Anonymous
-                // because Canvas tokens are only valid for the internal Canvas project.
-                if (isCustom) {
-                    console.log("Using Custom Config: Signing in Anonymously...");
-                    await signInAnonymously(auth);
-                } else if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    // Internal Canvas environment
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Authentication Error:", error);
-                // Last ditch fallback
-                try { await signInAnonymously(auth); } catch(e) { console.error("Fallback failed", e); }
-            }
-
             onAuthStateChanged(auth, (u) => {
                 state.user = u;
-                if (u) startListeners();
-                else {
+                
+                const authContainer = document.getElementById('auth-container');
+                const sidebar = document.getElementById('app-sidebar');
+                const mainApp = document.getElementById('app-main');
+                const userDisplay = document.getElementById('user-email-display');
+
+                if (u) {
+                    // Logged In
+                    authContainer.classList.add('hidden');
+                    sidebar.classList.remove('hidden');
+                    sidebar.classList.add('md:flex'); // Restore md:flex class
+                    mainApp.classList.remove('hidden');
+                    userDisplay.innerText = u.email;
+                    
+                    startListeners();
+                } else {
+                    // Logged Out
+                    authContainer.classList.remove('hidden');
+                    authContainer.innerHTML = generateAuthView();
+                    sidebar.classList.add('hidden');
+                    sidebar.classList.remove('md:flex');
+                    mainApp.classList.add('hidden');
+                    
                     state.loading = false;
-                    renderMainContent();
+                    state.inventory = [];
+                    state.locations = [];
+                    state.logs = [];
+                    lucide.createIcons();
                 }
             });
             updateNavUI();
         }
 
         function startListeners() {
+            state.loading = true;
+            // Removed user ID check here since we want shared data, but auth gating
             onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'), (snap) => {
                 state.inventory = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 checkLoading();
