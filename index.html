@@ -9,6 +9,9 @@
     <meta name="apple-mobile-web-app-title" content="Inventory">
     <title>Inventory</title>
     
+    <!-- Favicon (Dynamic) -->
+    <link rel="icon" id="favicon-link">
+
     <!-- PWA Manifest (Inline) -->
     <link rel="manifest" id="manifest-placeholder">
 
@@ -32,7 +35,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 
     <style>
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Inter', sans-serif; }
+        /* Globally disable tap highlight */
+        * { -webkit-tap-highlight-color: transparent; }
+        
         .scroller { -webkit-overflow-scrolling: touch; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -154,6 +160,11 @@
                 <i data-lucide="box" class="w-5 h-5 mb-1"></i>
                 <span class="text-[9px] font-medium">Boxes</span>
             </button>
+            <!-- Added Activity Log for Mobile -->
+            <button onclick="app.setActiveTab('activity')" id="mob-activity" class="flex-1 flex flex-col items-center p-2 mobile-nav-inactive">
+                <i data-lucide="clipboard-list" class="w-5 h-5 mb-1"></i>
+                <span class="text-[9px] font-medium">Logs</span>
+            </button>
             <button onclick="app.setActiveTab('settings')" id="mob-settings" class="flex-1 flex flex-col items-center p-2 mobile-nav-inactive">
                 <i data-lucide="menu" class="w-6 h-6 mb-1"></i>
                 <span class="text-[9px] font-medium">More</span>
@@ -192,6 +203,22 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, writeBatch, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // --- ICON GENERATION (Blue box with white package) ---
+        // Matches <div class="bg-blue-600 p-1.5 rounded-lg"><i data-lucide="package" class="w-6 h-6 text-white"></i></div>
+        const appIconSvg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+            <rect width="512" height="512" rx="100" fill="#2563eb"/>
+            <!-- Package Icon Path -->
+            <path d="M256 120 L100 200 L100 380 L256 460 L412 380 L412 200 Z" fill="none" stroke="white" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="M100 200 L256 280 L412 200" fill="none" stroke="white" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="M256 460 L256 280" fill="none" stroke="white" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>
+            <line x1="200" y1="250" x2="312" y2="250" stroke="white" stroke-width="32" stroke-linecap="round"/>
+        </svg>`;
+        const appIconUrl = 'data:image/svg+xml;base64,' + btoa(appIconSvg);
+        
+        // Set Favicon
+        document.getElementById('favicon-link').href = appIconUrl;
+
         // Generate PWA Manifest dynamically
         const manifest = {
             "name": "Inventory Manager",
@@ -201,8 +228,8 @@
             "background_color": "#ffffff",
             "theme_color": "#2563eb",
             "icons": [
-                { "src": "https://img.icons8.com/color/192/box-important--v1.png", "sizes": "192x192", "type": "image/png" },
-                { "src": "https://img.icons8.com/color/512/box-important--v1.png", "sizes": "512x512", "type": "image/png" }
+                { "src": appIconUrl, "sizes": "512x512", "type": "image/svg+xml" },
+                { "src": appIconUrl, "sizes": "192x192", "type": "image/svg+xml" }
             ]
         };
         const stringManifest = JSON.stringify(manifest);
@@ -257,6 +284,24 @@
             if (typeof str !== 'string') return str;
             return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
         };
+
+        // Helper for Philippines Timezone
+        function formatDatePH(isoString) {
+            if (!isoString) return '';
+            try {
+                return new Date(isoString).toLocaleString('en-US', { 
+                    timeZone: 'Asia/Manila',
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: 'numeric', 
+                    minute: '2-digit',
+                    hour12: true
+                });
+            } catch (e) {
+                return new Date(isoString).toLocaleString();
+            }
+        }
 
         function getFloorPrefix(name) {
             const match = name.match(/(\d+)/);
@@ -697,7 +742,8 @@
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     <div class="divide-y divide-gray-100">
                         ${logs.map(log => {
-                            const date = new Date(log.timestamp).toLocaleString();
+                            // Use PH Timezone
+                            const date = formatDatePH(log.timestamp);
                             let icon = 'info';
                             let colorClass = 'text-gray-500 bg-gray-100';
 
@@ -856,70 +902,6 @@
                     `).join('')}
                 </div>
             </div>`;
-        }
-
-        function generateLocationSettings() {
-             const floors = state.locations.filter(l => l.type === 'floor').sort((a,b) => a.name.localeCompare(b.name));
-             const boxes = state.locations.filter(l => l.type === 'box').sort((a,b) => a.name.localeCompare(b.name));
-
-             return `
-             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <!-- Floors & Rooms -->
-                <div class="space-y-4">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-bold text-gray-800">Floors & Rooms</h3>
-                        <button onclick="app.openAddLocationModal('floor')" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100 transition">+ Add Floor</button>
-                    </div>
-                    <div class="space-y-4">
-                        ${floors.map(floor => {
-                            const rooms = state.locations.filter(l => l.parentId === floor.id).sort((a,b) => a.name.localeCompare(b.name));
-                            return `
-                            <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                                <div class="bg-gray-50 px-3 py-2 border-b border-gray-200 flex justify-between items-center">
-                                    <span class="font-bold text-gray-800 text-sm flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4 text-indigo-500"></i> ${floor.name}</span>
-                                    <div class="flex gap-1">
-                                        <button onclick="app.openAddLocationModal('room', '${floor.id}')" class="text-xs bg-white border border-gray-300 px-2 py-0.5 rounded text-gray-600 hover:bg-gray-50">+ Room</button>
-                                        <button onclick="app.openEditLocationModal('${floor.id}')" class="text-gray-400 hover:text-blue-600 p-1"><i data-lucide="settings-2" class="w-3.5 h-3.5"></i></button>
-                                    </div>
-                                </div>
-                                <div class="p-2 space-y-1">
-                                    ${rooms.length > 0 ? rooms.map(room => `
-                                        <div class="flex justify-between items-center p-2 rounded hover:bg-gray-50 group">
-                                            <div class="flex items-center gap-2">
-                                                <div class="w-1.5 h-1.5 rounded-full ${room.status === 'occupied' ? 'bg-red-500' : (room.status === 'maintenance' ? 'bg-yellow-500' : 'bg-green-500')}"></div>
-                                                <span class="text-sm text-gray-700">${room.name}</span>
-                                                <span class="text-[10px] text-gray-400 font-mono border px-1 rounded">${room.customId || 'N/A'}</span>
-                                            </div>
-                                            <button onclick="app.openEditLocationModal('${room.id}')" class="text-gray-300 hover:text-blue-600 p-1 opacity-0 group-hover:opacity-100 transition"><i data-lucide="pencil" class="w-3 h-3"></i></button>
-                                        </div>
-                                    `).join('') : '<div class="p-2 text-xs text-gray-400 italic text-center">No rooms</div>'}
-                                </div>
-                            </div>`;
-                        }).join('')}
-                    </div>
-                </div>
-
-                <!-- Boxes -->
-                <div class="space-y-4">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-bold text-gray-800">Boxes & Containers</h3>
-                        <button onclick="app.openAddLocationModal('box')" class="px-3 py-1.5 bg-orange-50 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-100 transition">+ Add Box</button>
-                    </div>
-                    <div class="bg-white border border-gray-200 rounded-xl p-4">
-                        ${boxes.length > 0 ? `<div class="grid grid-cols-2 gap-3">
-                            ${boxes.map(box => `
-                                <div class="flex justify-between items-center p-2 border border-gray-100 rounded-lg hover:border-orange-200 group">
-                                    <div class="flex items-center gap-2">
-                                        <i data-lucide="box" class="w-4 h-4 text-orange-500"></i>
-                                        <span class="text-sm font-medium text-gray-700 truncate">${box.name}</span>
-                                    </div>
-                                    <button onclick="app.openEditLocationModal('${box.id}')" class="text-gray-300 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
-                                </div>
-                            `).join('')}
-                        </div>` : '<div class="text-center py-8 text-gray-400 italic">No boxes registered.</div>'}
-                    </div>
-                </div>
-             </div>`;
         }
 
         function generateInventoryItems() {
@@ -1260,7 +1242,7 @@
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF();
                 const now = new Date();
-                const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+                const dateStr = formatDatePH(now.toISOString());
 
                 // Corporate Colors
                 const darkBlue = [26, 54, 93]; 
@@ -1469,7 +1451,7 @@
                     yPos += 10;
 
                     const logRows = state.logs.slice(0, 50).map(l => {
-                        return [new Date(l.timestamp).toLocaleString(), l.action, l.details];
+                        return [formatDatePH(l.timestamp), l.action, l.details];
                     });
 
                     doc.autoTable({
@@ -1685,25 +1667,247 @@
                     renderModal(state.currentModal.type, state.currentModal.data);
                 }
             },
-
-            generateNextId: (prefix) => {
-                if (!prefix) return 'ITEM-001';
-                const regex = new RegExp(`^${prefix}(\\d+)$`);
-                const existingIds = state.inventory
-                    .filter(i => i.equipmentId && i.equipmentId.match(regex))
-                    .map(i => parseInt(i.equipmentId.match(regex)[1]));
-                
-                let nextNum = 1;
-                if (existingIds.length > 0) {
-                    nextNum = Math.max(...existingIds) + 1;
+            
+            toggleCondition: async (id, currentCondition) => {
+                const newCondition = currentCondition === 'Working' ? 'Defective' : 'Working';
+                try {
+                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id);
+                    await updateDoc(ref, { condition: newCondition });
+                    showToast(`Condition set to ${newCondition}`);
+                } catch (e) {
+                    console.error(e);
+                    showToast('Error updating condition', 'error');
                 }
-                return `${prefix}${String(nextNum).padStart(4, '0')}`;
+            },
+            
+            deleteItem: (id, name, equipId, permanent) => {
+                const doDelete = async () => {
+                    try {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id));
+                        if (permanent) {
+                             const retiredRef = doc(db, 'artifacts', appId, 'public', 'data', 'global_settings', 'masterData');
+                             const currentRetired = state.masterData.retiredIds || [];
+                             if (!currentRetired.includes(equipId)) {
+                                 await updateDoc(retiredRef, { retiredIds: [...currentRetired, equipId] });
+                             }
+                        }
+                        await logActivity('Item Deleted', `Deleted ${name} (${equipId}) ${permanent ? 'permanently' : ''}`);
+                        showToast('Item deleted');
+                    } catch(e) { console.error(e); showToast('Delete failed', 'error'); }
+                };
+                app.openConfirmModal(`Are you sure you want to delete ${name}?`, doDelete);
+            },
+            
+            toggleDisposal: async (id, name, equipId, restore) => {
+                 try {
+                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id);
+                    await updateDoc(ref, { isDisposed: !restore, locationId: null }); 
+                    await logActivity('Item Status', `${restore ? 'Restored' : 'Disposed'} ${name} (${equipId})`);
+                    showToast(restore ? 'Item Restored' : 'Item Disposed');
+                 } catch(e) { console.error(e); showToast('Action failed', 'error'); }
+            },
+            
+            submitMoveItem: async (itemId, locationId, name, equipId) => {
+                 try {
+                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', itemId);
+                    if (locationId === 'PULLOUT') {
+                        await updateDoc(ref, { isDisposed: true, locationId: null });
+                        await logActivity('Item Moved', `Moved ${name} (${equipId}) to Pullout`);
+                    } else {
+                        const finalLoc = locationId === "" ? null : locationId;
+                        await updateDoc(ref, { locationId: finalLoc, isDisposed: false });
+                        const locName = getLocationNamePlain(finalLoc);
+                        await logActivity('Item Moved', `Moved ${name} (${equipId}) to ${locName}`);
+                    }
+                    app.closeModal();
+                    showToast('Item moved');
+                 } catch(e) { console.error(e); showToast('Move failed', 'error'); }
+            },
+            
+            submitAddLocation: async (e) => {
+                e.preventDefault();
+                const form = e.target;
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'locations'), {
+                        type: form.type.value,
+                        parentId: form.parentId.value || null,
+                        name: form.name.value,
+                        customId: form.customId ? form.customId.value : null,
+                        status: form.status ? form.status.value : null,
+                        createdAt: new Date().toISOString()
+                    });
+                    await logActivity('Location Created', `Created ${form.type.value}: ${form.name.value}`);
+                    app.closeModal();
+                    showToast('Location created');
+                } catch(e) { console.error(e); showToast('Error creating location', 'error'); }
+            },
+            
+            submitEditLocation: async (e, id) => {
+                 e.preventDefault();
+                 const form = e.target;
+                 try {
+                     const updateData = { name: form.name.value };
+                     if (form.customId) updateData.customId = form.customId.value;
+                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', id), updateData);
+                     await logActivity('Location Updated', `Updated location: ${form.name.value}`);
+                     app.closeModal();
+                     showToast('Location updated');
+                 } catch(e) { console.error(e); showToast('Error updating location', 'error'); }
+            },
+            
+            deleteLocation: (id) => {
+                 const doDelete = async () => {
+                     try {
+                         const items = state.inventory.filter(i => i.locationId === id);
+                         const batch = writeBatch(db);
+                         items.forEach(i => {
+                             batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { locationId: null });
+                         });
+                         batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'locations', id));
+                         await batch.commit();
+                         await logActivity('Location Deleted', `Deleted location ID: ${id}`);
+                         app.closeModal();
+                         showToast('Location deleted');
+                     } catch(e) { console.error(e); showToast('Delete failed', 'error'); }
+                 };
+                 app.openConfirmModal("Delete this location? Items will be moved to Storage.", doDelete);
+            },
+            
+            submitAddItems: async (e, locationId) => {
+                e.preventDefault();
+                const form = e.target;
+                const checkboxes = form.querySelectorAll('input[name="selectedItems"]:checked');
+                if (checkboxes.length === 0) return;
+                
+                try {
+                    const batch = writeBatch(db);
+                    checkboxes.forEach(cb => {
+                        batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', cb.value), { locationId: locationId || null });
+                    });
+                    await batch.commit();
+                    await logActivity('Items Moved', `Moved ${checkboxes.length} items to ${getLocationNamePlain(locationId)}`);
+                    app.closeModal();
+                    showToast(`${checkboxes.length} items moved`);
+                } catch(e) { console.error(e); showToast('Move failed', 'error'); }
+            },
+            
+            submitManageCategory: async (e, action, oldName) => {
+                e.preventDefault();
+                const newName = e.target.name.value.trim();
+                if(!newName) return;
+                
+                let cats = [...(state.masterData.categories || [])];
+                
+                if (action === 'add') {
+                    if(cats.some(c => c.name === newName)) return alert('Category exists');
+                    cats.push({ name: newName, subs: [] });
+                } else if (action === 'rename') {
+                    const idx = cats.findIndex(c => c.name === oldName);
+                    if(idx === -1) return;
+                    cats[idx].name = newName;
+                    
+                    const batch = writeBatch(db);
+                    const items = state.inventory.filter(i => i.category === oldName);
+                    items.forEach(i => {
+                        batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { category: newName });
+                    });
+                    await batch.commit();
+                }
+                state.masterData.categories = cats;
+                await saveMasterData();
+                app.closeModal();
+                showToast('Category updated');
+            },
+            
+            submitManageSubCategory: async (e, action, parentCat, oldName) => {
+                 e.preventDefault();
+                 const newName = e.target.name.value.trim();
+                 if(!newName) return;
+                 
+                 let cats = [...(state.masterData.categories || [])];
+                 const catIdx = cats.findIndex(c => c.name === parentCat);
+                 if(catIdx === -1) return;
+                 
+                 let subs = cats[catIdx].subs || [];
+                 
+                 if(action === 'add') {
+                     if(subs.includes(newName)) return alert('Sub-category exists');
+                     subs.push(newName);
+                 } else if (action === 'rename') {
+                     const idx = subs.indexOf(oldName);
+                     if(idx === -1) return;
+                     subs[idx] = newName;
+                     
+                     const batch = writeBatch(db);
+                     const items = state.inventory.filter(i => i.category === parentCat && i.subCategory === oldName);
+                     items.forEach(i => {
+                         batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { subCategory: newName });
+                     });
+                     await batch.commit();
+                 }
+                 cats[catIdx].subs = subs;
+                 state.masterData.categories = cats;
+                 await saveMasterData();
+                 app.closeModal();
+                 showToast('Sub-category updated');
+            },
+            
+            submitMoveSubCategory: async (e, subName, currentParent) => {
+                e.preventDefault();
+                const newParent = e.target.newParent.value;
+                if(!newParent || newParent === currentParent) return;
+
+                let cats = [...(state.masterData.categories || [])];
+                
+                const oldCatIdx = cats.findIndex(c => c.name === currentParent);
+                if(oldCatIdx !== -1) {
+                    cats[oldCatIdx].subs = cats[oldCatIdx].subs.filter(s => s !== subName);
+                }
+                
+                const newCatIdx = cats.findIndex(c => c.name === newParent);
+                if(newCatIdx !== -1) {
+                    if(!cats[newCatIdx].subs) cats[newCatIdx].subs = [];
+                    if(!cats[newCatIdx].subs.includes(subName)) cats[newCatIdx].subs.push(subName);
+                }
+                
+                const batch = writeBatch(db);
+                const items = state.inventory.filter(i => i.category === currentParent && i.subCategory === subName);
+                items.forEach(i => {
+                    batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { category: newParent });
+                });
+                await batch.commit();
+                
+                state.masterData.categories = cats;
+                await saveMasterData();
+                app.closeModal();
+                showToast('Sub-category moved');
+            },
+            
+            deleteMasterCategory: async (name) => {
+                if(!confirm(`Delete category "${name}"? Items will become Uncategorized.`)) return;
+                let cats = (state.masterData.categories || []).filter(c => c.name !== name);
+                state.masterData.categories = cats;
+                await saveMasterData();
+                 showToast('Category deleted');
+            },
+            
+            deleteMasterSubCategory: async (catName, subName) => {
+                if(!confirm(`Delete sub-category "${subName}"?`)) return;
+                let cats = [...(state.masterData.categories || [])];
+                const idx = cats.findIndex(c => c.name === catName);
+                if(idx !== -1) {
+                    cats[idx].subs = cats[idx].subs.filter(s => s !== subName);
+                    state.masterData.categories = cats;
+                    await saveMasterData();
+                    showToast('Sub-category deleted');
+                }
             }
         };
 
         // --- Render Helpers ---
 
         function updateNavUI() {
+            // Added 'activity' to desktop nav list
             ['dashboard', 'storage', 'floors', 'boxes', 'activity', 'settings'].forEach(tab => {
                 const btn = document.getElementById(`nav-${tab}`);
                 if (btn) {
@@ -1718,8 +1922,8 @@
                     }
                 }
             });
-            // Update Mobile Nav
-            ['dashboard', 'storage', 'floors', 'boxes', 'settings'].forEach(tab => {
+            // Update Mobile Nav - Added 'activity'
+            ['dashboard', 'storage', 'floors', 'boxes', 'activity', 'settings'].forEach(tab => {
                 const btn = document.getElementById(`mob-${tab}`);
                 if (btn) {
                     if (tab === state.activeTab) {
