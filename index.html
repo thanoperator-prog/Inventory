@@ -2,9 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Inventory">
     <title>Inventory</title>
     
+    <!-- PWA Manifest (Inline) -->
+    <link rel="manifest" id="manifest-placeholder">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -25,14 +32,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
         .scroller { -webkit-overflow-scrolling: touch; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
+        /* Sidebar Active State */
         .nav-item-active { background-color: #eff6ff; color: #2563eb; border-right: 3px solid #2563eb; }
         .nav-item-inactive { color: #64748b; }
         .nav-item-inactive:hover { background-color: #f8fafc; color: #1e293b; }
+
+        /* Mobile Bottom Nav Active State */
+        .mobile-nav-active { color: #2563eb; font-weight: 600; }
+        .mobile-nav-inactive { color: #94a3b8; }
 
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -45,73 +57,108 @@
             to { transform: translateX(0); opacity: 1; }
         }
         .toast-enter { animation: slideIn 0.3s ease-out forwards; }
+
+        /* Prevent pull-to-refresh on mobile */
+        body { overscroll-behavior-y: none; }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 h-screen flex overflow-hidden">
 
-    <!-- Sidebar -->
-    <aside class="w-16 md:w-64 bg-white border-r border-gray-200 flex flex-col flex-none z-30 transition-all duration-300">
-        <div class="h-16 flex items-center justify-center md:justify-start md:px-6 border-b border-gray-100 flex-none">
+    <!-- Sidebar (Desktop Only) -->
+    <aside class="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col flex-none z-30 transition-all duration-300">
+        <div class="h-16 flex items-center justify-start px-6 border-b border-gray-100 flex-none">
             <div class="bg-blue-600 p-1.5 rounded-lg">
                 <i data-lucide="package" class="w-6 h-6 text-white"></i>
             </div>
-            <span class="hidden md:block ml-3 font-bold text-lg text-gray-800 tracking-tight">Inventory</span>
+            <span class="ml-3 font-bold text-lg text-gray-800 tracking-tight">Inventory</span>
         </div>
 
-        <nav class="flex-1 py-6 flex flex-col gap-2 px-2 md:px-4 overflow-y-auto scroller">
-            <button onclick="app.setActiveTab('dashboard')" id="nav-dashboard" class="nav-btn group flex items-center justify-center md:justify-start px-3 py-3 rounded-lg transition-all">
+        <nav class="flex-1 py-6 flex flex-col gap-2 px-4 overflow-y-auto scroller">
+            <button onclick="app.setActiveTab('dashboard')" id="nav-dashboard" class="nav-btn group flex items-center justify-start px-3 py-3 rounded-lg transition-all">
                 <i data-lucide="layout-dashboard" class="w-6 h-6 flex-none"></i>
-                <span class="hidden md:block ml-3 font-medium text-sm">Dashboard</span>
+                <span class="ml-3 font-medium text-sm">Dashboard</span>
             </button>
             <div class="my-1 border-t border-gray-100"></div>
-            <button onclick="app.setActiveTab('storage')" id="nav-storage" class="nav-btn group flex items-center justify-center md:justify-start px-3 py-3 rounded-lg transition-all">
+            <button onclick="app.setActiveTab('storage')" id="nav-storage" class="nav-btn group flex items-center justify-start px-3 py-3 rounded-lg transition-all">
                 <i data-lucide="package" class="w-6 h-6 flex-none"></i>
-                <span class="hidden md:block ml-3 font-medium text-sm">Storage</span>
+                <span class="ml-3 font-medium text-sm">Storage</span>
             </button>
-            <button onclick="app.setActiveTab('floors')" id="nav-floors" class="nav-btn group flex items-center justify-center md:justify-start px-3 py-3 rounded-lg transition-all">
+            <button onclick="app.setActiveTab('floors')" id="nav-floors" class="nav-btn group flex items-center justify-start px-3 py-3 rounded-lg transition-all">
                 <i data-lucide="layers" class="w-6 h-6 flex-none"></i>
-                <span class="hidden md:block ml-3 font-medium text-sm">Floors</span>
+                <span class="ml-3 font-medium text-sm">Floors</span>
             </button>
-            <button onclick="app.setActiveTab('boxes')" id="nav-boxes" class="nav-btn group flex items-center justify-center md:justify-start px-3 py-3 rounded-lg transition-all">
+            <button onclick="app.setActiveTab('boxes')" id="nav-boxes" class="nav-btn group flex items-center justify-start px-3 py-3 rounded-lg transition-all">
                 <i data-lucide="box" class="w-6 h-6 flex-none"></i>
-                <span class="hidden md:block ml-3 font-medium text-sm">Boxes</span>
+                <span class="ml-3 font-medium text-sm">Boxes</span>
             </button>
             <div class="my-2 border-t border-gray-100"></div>
-            <button onclick="app.setActiveTab('activity')" id="nav-activity" class="nav-btn group flex items-center justify-center md:justify-start px-3 py-3 rounded-lg transition-all">
+            <button onclick="app.setActiveTab('activity')" id="nav-activity" class="nav-btn group flex items-center justify-start px-3 py-3 rounded-lg transition-all">
                 <i data-lucide="clipboard-list" class="w-6 h-6 flex-none"></i>
-                <span class="hidden md:block ml-3 font-medium text-sm">Activity Log</span>
+                <span class="ml-3 font-medium text-sm">Activity Log</span>
             </button>
         </nav>
         
-        <!-- Settings Footer -->
+        <!-- Settings Footer (Desktop) -->
         <div class="p-4 border-t border-gray-100">
-             <button onclick="app.setActiveTab('settings')" id="nav-settings" class="w-full nav-btn group flex items-center justify-center md:justify-start px-3 py-3 rounded-lg transition-all hover:bg-gray-50 text-gray-500 hover:text-gray-900">
+             <button onclick="app.setActiveTab('settings')" id="nav-settings" class="w-full nav-btn group flex items-center justify-start px-3 py-3 rounded-lg transition-all hover:bg-gray-50 text-gray-500 hover:text-gray-900">
                 <i data-lucide="settings" class="w-6 h-6 flex-none"></i>
-                <span class="hidden md:block ml-3 font-medium text-sm">Settings</span>
+                <span class="ml-3 font-medium text-sm">Settings</span>
             </button>
         </div>
     </aside>
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col min-w-0 bg-gray-50">
-        <header class="bg-white border-b border-gray-200 h-16 px-4 md:px-8 flex items-center justify-between shadow-sm z-10 flex-none">
-            <div>
-                <h1 id="header-title" class="text-xl font-bold text-gray-800">Overview</h1>
-                <p class="text-xs text-gray-500 hidden sm:block">Manage your equipment inventory and locations</p>
+    <div class="flex-1 flex flex-col min-w-0 bg-gray-50 h-full relative">
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200 h-16 px-4 md:px-8 flex items-center justify-between shadow-sm z-20 flex-none sticky top-0">
+            <div class="flex items-center">
+                <div class="md:hidden bg-blue-600 p-1.5 rounded-lg mr-3">
+                    <i data-lucide="package" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                    <h1 id="header-title" class="text-lg md:text-xl font-bold text-gray-800">Overview</h1>
+                    <p class="text-xs text-gray-500 hidden sm:block">Manage your equipment inventory and locations</p>
+                </div>
             </div>
             <div class="flex items-center gap-3">
                 <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full border border-green-200 font-medium flex items-center gap-1">
-                    <div class="w-1.5 h-1.5 rounded-full bg-green-500"></div> Live
+                    <div class="w-1.5 h-1.5 rounded-full bg-green-500"></div> <span class="hidden sm:inline">Live</span>
                 </span>
             </div>
         </header>
 
-        <main id="main-content" class="flex-1 overflow-y-auto p-4 md:p-8 scroller relative">
+        <!-- Scrollable Content -->
+        <main id="main-content" class="flex-1 overflow-y-auto p-4 md:p-8 scroller pb-24 md:pb-8">
             <div id="loading-state" class="flex h-full items-center justify-center text-gray-500">
                 <div class="animate-spin mr-2"><i data-lucide="loader-2"></i></div>
                 Loading data...
             </div>
         </main>
+
+        <!-- Mobile Bottom Navigation (Visible on Small Screens) -->
+        <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-between px-2 pb-safe pt-2 z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <button onclick="app.setActiveTab('dashboard')" id="mob-dashboard" class="flex-1 flex flex-col items-center p-2 mobile-nav-inactive">
+                <i data-lucide="layout-dashboard" class="w-5 h-5 mb-1"></i>
+                <span class="text-[9px] font-medium">Home</span>
+            </button>
+            <button onclick="app.setActiveTab('storage')" id="mob-storage" class="flex-1 flex flex-col items-center p-2 mobile-nav-inactive">
+                <i data-lucide="package" class="w-5 h-5 mb-1"></i>
+                <span class="text-[9px] font-medium">Items</span>
+            </button>
+            <button onclick="app.setActiveTab('floors')" id="mob-floors" class="flex-1 flex flex-col items-center p-2 mobile-nav-inactive">
+                <i data-lucide="layers" class="w-5 h-5 mb-1"></i>
+                <span class="text-[9px] font-medium">Floors</span>
+            </button>
+            <button onclick="app.setActiveTab('boxes')" id="mob-boxes" class="flex-1 flex flex-col items-center p-2 mobile-nav-inactive">
+                <i data-lucide="box" class="w-5 h-5 mb-1"></i>
+                <span class="text-[9px] font-medium">Boxes</span>
+            </button>
+            <button onclick="app.setActiveTab('settings')" id="mob-settings" class="flex-1 flex flex-col items-center p-2 mobile-nav-inactive">
+                <i data-lucide="menu" class="w-6 h-6 mb-1"></i>
+                <span class="text-[9px] font-medium">More</span>
+            </button>
+        </nav>
     </div>
 
     <!-- Modals -->
@@ -145,8 +192,25 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, writeBatch, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // Generate PWA Manifest dynamically
+        const manifest = {
+            "name": "Inventory Manager",
+            "short_name": "Inventory",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#2563eb",
+            "icons": [
+                { "src": "https://img.icons8.com/color/192/box-important--v1.png", "sizes": "192x192", "type": "image/png" },
+                { "src": "https://img.icons8.com/color/512/box-important--v1.png", "sizes": "512x512", "type": "image/png" }
+            ]
+        };
+        const stringManifest = JSON.stringify(manifest);
+        const blob = new Blob([stringManifest], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(blob);
+        document.querySelector('#manifest-placeholder').setAttribute('href', manifestURL);
+
         // --- FIREBASE CONFIGURATION ---
-        // Configured with user credentials
         const customConfig = {
             apiKey: "AIzaSyAOB5sXGQPdchw3jhWojfy749cOTeAcfyw",
             authDomain: "inventory-app-84fbf.firebaseapp.com",
@@ -157,13 +221,11 @@
             measurementId: "G-3KLSG5BE43"
         };
 
-        // Select correct config
         let firebaseConfig;
         if (customConfig && customConfig.apiKey) {
             console.log("Using Custom Firebase Config");
             firebaseConfig = customConfig;
         } else if (typeof __firebase_config !== 'undefined') {
-            // Fallback for preview environment if customConfig is empty
             firebaseConfig = JSON.parse(__firebase_config);
         } else {
             console.error("No Firebase configuration found.");
@@ -173,7 +235,6 @@
         const auth = getAuth(appInstance);
         const db = getFirestore(appInstance);
         
-        // Use custom appId prefix if provided in config, otherwise default
         const appId = customConfig.appId ? 'inventory-app-84fbf' : (typeof __app_id !== 'undefined' ? __app_id : 'default-app-id');
 
         const state = {
@@ -181,11 +242,10 @@
             inventory: [],
             locations: [],
             logs: [],
-            // Added retiredIds to track permanently deleted IDs
             masterData: { categories: [], retiredIds: [] }, 
             activeTab: 'dashboard', 
             storageViewMode: 'active', 
-            settingsTab: 'categories', // categories | locations | reports
+            settingsTab: 'categories',
             currentModal: null, 
             pendingAction: null,
             loading: true,
@@ -405,6 +465,20 @@
                     return `<div class="flex justify-between items-center p-4 bg-white hover:bg-gray-50 transition rounded-xl border border-gray-100 shadow-sm group"><div class="flex items-center gap-3"><button onclick="app.toggleCondition('${i.id}', '${i.condition || 'Working'}')" class="w-3 h-3 rounded-full ${statusColor} hover:scale-125 transition shadow-sm" title="${i.condition || 'Working'} (Click to toggle)"></button><div class="bg-blue-50 text-blue-600 font-mono text-xs font-bold px-2 py-1 rounded">${i.equipmentId}</div><div><p class="text-sm font-bold text-gray-800 flex items-center">${quantityBadge} ${i.name}</p><p class="text-xs text-gray-500">${i.category}</p></div></div><div class="flex gap-2"><button onclick="app.openMoveItemModal('${i.id}')" class="text-gray-400 hover:text-blue-600 p-1.5 rounded hover:bg-blue-50 transition" title="Move"><i data-lucide="arrow-right-left" class="w-4 h-4"></i></button></div></div>`
                 }).join('');
                 html = `<div class="bg-white rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl pointer-events-auto animate-in border border-gray-100"><div class="p-5 border-b border-gray-100 flex justify-between items-center bg-white rounded-t-2xl"><div><h3 class="font-bold text-xl text-gray-800 flex items-center gap-2">${loc ? loc.name : 'Unknown'} ${loc && loc.customId ? `<span class="text-sm font-normal text-gray-400 border border-gray-200 px-2 rounded-md">${loc.customId}</span>` : ''}</h3><p class="text-xs text-gray-500">${items.length} items inside</p></div><div class="flex gap-2"><button onclick="app.openSwapModal('${loc.id}')" class="bg-indigo-50 p-2 rounded-full shadow-sm text-indigo-600 hover:bg-indigo-100 hover:scale-105 transition" title="Swap"><i data-lucide="arrow-right-left" class="w-5 h-5"></i></button><button onclick="app.openEditLocationModal('${loc.id}')" class="bg-gray-50 p-2 rounded-full shadow-sm text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition"><i data-lucide="pencil" class="w-5 h-5"></i></button><button onclick="app.closeModal()" class="bg-gray-50 p-2 rounded-full shadow-sm text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"><i data-lucide="x" class="w-5 h-5"></i></button></div></div><div class="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between"><span class="text-xs font-bold text-gray-500 uppercase">Quick Actions</span><button onclick="app.openAddItemsModal('${loc.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm flex items-center gap-1 transition transform active:scale-95"><i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Items</button></div>${statusControls}<div class="p-4 overflow-y-auto flex-1 space-y-2 scroller bg-gray-50/30">${list}</div></div>`;
+            } else if (type === 'editItemName') {
+                const item = state.inventory.find(i => i.id === data.itemId); if (!item) return;
+                html = `<div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl pointer-events-auto animate-in border border-gray-100">
+                    <h3 class="font-bold text-xl mb-4 text-gray-800">Rename Item</h3>
+                    <p class="text-sm text-gray-500 mb-6">Renaming <strong>${item.name}</strong> will update all identical items.</p>
+                    <form onsubmit="app.submitEditItemName(event, '${item.name}', '${item.category}', '${item.subCategory}')">
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">New Item Name</label>
+                        <input name="newName" required value="${item.name}" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition mb-6" autofocus />
+                        <div class="flex justify-end gap-3">
+                            <button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button>
+                            <button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-lg hover:bg-blue-700 transition transform active:scale-95">Rename All</button>
+                        </div>
+                    </form>
+                </div>`;
             }
 
             content.innerHTML = html;
@@ -990,6 +1064,7 @@
                                     <div>
                                         <h3 class="font-bold text-gray-900 text-sm leading-tight pr-2 flex items-center gap-1">
                                             ${name}
+                                            ${!isDisposalMode ? `<button onclick="app.openEditItemNameModal('${items[0].id}')" class="text-gray-300 hover:text-blue-600 ml-1 inline-block"><i data-lucide="pencil" class="w-3 h-3"></i></button>` : ''}
                                         </h3>
                                         <span class="${badgeColor} text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1">${badgeText}</span>
                                     </div>
@@ -1031,6 +1106,7 @@
             openRenameModal: (type, currentVal, parentCat, parentSub) => renderModal('rename', { type, currentVal, parentCat, parentSub }),
             openAddStockModal: (category, subCategory, name) => renderModal('addStock', { category, subCategory, name }),
             openAddItemsModal: (locationId) => renderModal('addItems', { locationId }),
+            openEditItemNameModal: (itemId) => renderModal('editItemName', { itemId }), // New
             handleFileUpload: (e) => {
                  const file = e.target.files[0];
                  if (!file) return;
@@ -1323,7 +1399,7 @@
                     yPos = doc.lastAutoTable.finalY + 20;
                 }
 
-                // --- 3. LOCATION STATUS (Detailed Assets) ---
+                // --- 3. LOCATION STATUS (Grouped by Floor & Sorted) ---
                 if (includeLocations) {
                     if (yPos > 250) { doc.addPage(); yPos = 20; }
                     doc.setTextColor(0, 0, 0);
@@ -1333,26 +1409,39 @@
                     doc.line(14, yPos + 2, 196, yPos + 2);
                     yPos += 10;
 
-                    const locRows = state.locations.filter(l => l.type === 'room').sort((a,b) => a.name.localeCompare(b.name)).map(l => {
-                        // Aggregate items in this room
-                        const roomItems = state.inventory.filter(i => i.locationId === l.id);
-                        const subCounts = {};
-                        roomItems.forEach(i => {
-                            const sub = i.subCategory || 'General';
-                            subCounts[sub] = (subCounts[sub] || 0) + 1;
-                        });
-                        
-                        // Format detailed string (e.g., "Cameras: 2, Lenses: 1")
-                        const assetDetails = Object.keys(subCounts).length > 0 
-                            ? Object.entries(subCounts).map(([k,v]) => `${k}: ${v}`).join('\n') 
-                            : 'Empty';
+                    const floors = state.locations.filter(l => l.type === 'floor').sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+                    const locRows = [];
 
-                        return [
-                            l.customId || 'N/A', 
-                            l.name, 
-                            l.status ? l.status.toUpperCase() : 'UNKNOWN', 
-                            assetDetails
-                        ];
+                    floors.forEach(floor => {
+                        // Floor Header
+                        locRows.push([{ content: floor.name.toUpperCase(), colSpan: 4, styles: { fillColor: [226, 232, 240], fontStyle: 'bold', textColor: [0,0,0] } }]);
+                        
+                        // Get Rooms for this floor
+                        const rooms = state.locations.filter(l => l.type === 'room' && l.parentId === floor.id)
+                            .sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+
+                        if (rooms.length === 0) {
+                             locRows.push([{ content: 'No rooms configured.', colSpan: 4, styles: { fontStyle: 'italic', textColor: [150,150,150] } }]);
+                        }
+
+                        rooms.forEach(l => {
+                             const roomItems = state.inventory.filter(i => i.locationId === l.id);
+                             const subCounts = {};
+                             roomItems.forEach(i => {
+                                const sub = i.subCategory || 'General';
+                                subCounts[sub] = (subCounts[sub] || 0) + 1;
+                             });
+                             const assetDetails = Object.keys(subCounts).length > 0 
+                                            ? Object.entries(subCounts).map(([k,v]) => `${k}: ${v}`).join(', ') 
+                                            : 'Empty';
+
+                             locRows.push([
+                                l.customId || 'N/A', 
+                                l.name, 
+                                l.status ? l.status.toUpperCase() : 'UNKNOWN', 
+                                assetDetails
+                             ]);
+                        });
                     });
 
                     doc.autoTable({
@@ -1513,311 +1602,35 @@
                 } catch (err) { console.error(err); showToast("Error saving items.", 'error'); }
             },
 
-            // --- CORE LOGIC ---
-
-            toggleCondition: async (itemId, currentCondition) => {
-                const item = state.inventory.find(i => i.id === itemId); // Find item
-                const name = item ? item.name : 'Unknown Item';
-                const code = item ? item.equipmentId : 'Unknown ID';
-                const newCondition = currentCondition === 'Defective' ? 'Working' : 'Defective';
-                try {
-                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', itemId);
-                    await updateDoc(ref, { condition: newCondition });
-                    await logActivity('Condition Changed', `${code} ${name} set to ${newCondition}`); // Readable log
-                    app.refreshModal();
-                } catch(err) { console.error(err); showToast("Failed to update condition.", 'error'); }
-            },
-
-            toggleDisposal: (itemId, itemName, itemCode, isDisposed) => {
-                // Determine action (Dispose or Restore)
-                const newStatus = !isDisposed; 
-                const action = newStatus ? 'Move to Pullout (Disposal)' : 'Restore to Active Inventory';
-                
-                app.openConfirmModal(`${action}?`, async () => {
-                    try {
-                        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', itemId);
-                        const update = { isDisposed: newStatus };
-                        // If moving TO disposal (newStatus is true), clear location
-                        // If restoring (newStatus is false), location stays null (Storage) until moved
-                        if (newStatus) update.locationId = null; 
-                        
-                        await updateDoc(ref, update);
-                        await logActivity(
-                            newStatus ? 'Item Disposed' : 'Item Restored', 
-                            `${itemCode} ${itemName} ${newStatus ? 'moved to pullout' : 'restored to active'}`
-                        );
-                        showToast(newStatus ? "Item Moved to Pullout" : "Item Restored");
-                    } catch(err) { console.error(err); showToast("Failed to update status.", 'error'); }
-                });
-            },
-
-            // UPDATED DELETE LOGIC
-            deleteItem: (itemId, itemName, itemCode, isPermanent) => {
-                const msg = isPermanent 
-                    ? "⚠️ PERMANENTLY DELETE this item? This ID will be retired forever." 
-                    : "Remove item? This ID will be available for reuse.";
-                
-                app.openConfirmModal(msg, async () => {
-                    try {
-                        if (isPermanent) {
-                            // Add to retired IDs list
-                            if (!state.masterData.retiredIds) state.masterData.retiredIds = [];
-                            state.masterData.retiredIds.push(itemCode);
-                            await saveMasterData();
-                        }
-
-                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', itemId));
-                        await logActivity('Item Deleted', `${itemCode} ${itemName} deleted (${isPermanent ? 'Permanent' : 'Reusable'})`);
-                        showToast("Item Deleted");
-                        if (!isPermanent) {
-                            renderStorageList();
-                        }
-                    } catch(err) { console.error(err); showToast("Failed to delete item.", 'error'); }
-                });
-            },
-
-            deleteCategory: (categoryName) => { // Legacy deletion from storage view
-                 app.openConfirmModal("Please manage Categories in the Settings tab.", () => app.setActiveTab('settings'));
-            },
-
-            deleteSubCategory: (subName, catName) => { // Legacy
-                 app.openConfirmModal("Please manage Sub-Categories in the Settings tab.", () => app.setActiveTab('settings'));
-            },
-
-            // --- Settings Logic ---
-
-            submitManageCategory: async (e, action, oldName) => {
+            submitEditItemName: async (e, oldName, category, subCategory) => {
                 e.preventDefault();
-                const newName = e.target.name.value.trim();
-                if(!newName) return;
-
-                const cats = state.masterData.categories;
-                if (action === 'add') {
-                    if (cats.some(c => c.name === newName)) { showToast("Category exists", 'error'); return; }
-                    cats.push({ name: newName, subs: [] });
-                } else if (action === 'rename') {
-                    const cat = cats.find(c => c.name === oldName);
-                    if (cat) cat.name = newName;
-                    // Batch update items
+                const newName = e.target.newName.value.trim();
+                if (!newName || newName === oldName) {
+                    app.closeModal();
+                    return;
+                }
+                
+                // Find all items with this name in this subcategory
+                const itemsToUpdate = state.inventory.filter(i => 
+                    i.name === oldName && 
+                    i.category === category && 
+                    i.subCategory === subCategory
+                );
+                
+                if (itemsToUpdate.length === 0) return;
+                
+                try {
                     const batch = writeBatch(db);
-                    state.inventory.filter(i => i.category === oldName).forEach(i => {
-                        batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { category: newName });
+                    itemsToUpdate.forEach(item => {
+                        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id);
+                        batch.update(ref, { name: newName });
                     });
-                    await batch.commit();
-                }
-                
-                await saveMasterData();
-                app.closeModal();
-                renderMainContent();
-            },
-
-            deleteMasterCategory: (name) => {
-                app.openConfirmModal(`Delete Category "${name}"?`, async () => {
-                    const idx = state.masterData.categories.findIndex(c => c.name === name);
-                    if (idx > -1) {
-                        state.masterData.categories.splice(idx, 1);
-                        await saveMasterData();
-                        showToast("Category Deleted");
-                        renderMainContent();
-                    }
-                });
-            },
-
-            submitManageSubCategory: async (e, action, parentCat, oldName) => {
-                e.preventDefault();
-                const newName = e.target.name.value.trim();
-                if(!newName) return;
-
-                const cat = state.masterData.categories.find(c => c.name === parentCat);
-                if (!cat) return;
-
-                if (action === 'add') {
-                    if (!cat.subs) cat.subs = [];
-                    if (cat.subs.includes(newName)) { showToast("Sub-category exists", 'error'); return; }
-                    cat.subs.push(newName);
-                } else if (action === 'rename') {
-                    const idx = cat.subs.indexOf(oldName);
-                    if (idx > -1) cat.subs[idx] = newName;
-                    // Batch update items
-                    const batch = writeBatch(db);
-                    state.inventory.filter(i => i.category === parentCat && i.subCategory === oldName).forEach(i => {
-                        batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id), { subCategory: newName });
-                    });
-                    await batch.commit();
-                }
-
-                await saveMasterData();
-                app.closeModal();
-                renderMainContent();
-            },
-
-            deleteMasterSubCategory: (parentCat, subName) => {
-                app.openConfirmModal(`Delete Sub-Category "${subName}"?`, async () => {
-                    const cat = state.masterData.categories.find(c => c.name === parentCat);
-                    if (cat && cat.subs) {
-                        const idx = cat.subs.indexOf(subName);
-                        if (idx > -1) {
-                            cat.subs.splice(idx, 1);
-                            await saveMasterData();
-                            showToast("Sub-Category Deleted");
-                            renderMainContent();
-                        }
-                    }
-                });
-            },
-
-            submitMoveSubCategory: async (e, subName, currentParent) => {
-                e.preventDefault();
-                const newParent = e.target.newParent.value;
-                if (!newParent || newParent === currentParent) return;
-
-                // 1. Update Master Data
-                const oldCat = state.masterData.categories.find(c => c.name === currentParent);
-                const newCat = state.masterData.categories.find(c => c.name === newParent);
-                
-                if (oldCat && newCat) {
-                    // Remove from old
-                    const idx = oldCat.subs.indexOf(subName);
-                    if (idx > -1) oldCat.subs.splice(idx, 1);
-                    // Add to new
-                    if (!newCat.subs) newCat.subs = [];
-                    if (!newCat.subs.includes(subName)) newCat.subs.push(subName);
                     
-                    await saveMasterData();
-
-                    // 2. Batch Update Inventory
-                    const batch = writeBatch(db);
-                    const itemsToMove = state.inventory.filter(i => i.category === currentParent && i.subCategory === subName);
-                    
-                    if (itemsToMove.length > 0) {
-                        itemsToMove.forEach(i => {
-                             const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id);
-                             batch.update(ref, { category: newParent });
-                        });
-                        await batch.commit();
-                        await logActivity('Category Moved', `Sub-category "${subName}" moved from ${currentParent} to ${newParent}. Updated ${itemsToMove.length} items.`);
-                        showToast(`Moved ${itemsToMove.length} items to ${newParent}`);
-                    } else {
-                        showToast("Category Structure Updated");
-                    }
-                    
-                    app.closeModal();
-                    renderMainContent();
-                }
-            },
-
-            deleteLocation: (locationId) => {
-                const loc = state.locations.find(l => l.id === locationId);
-                if(!loc) return;
-                
-                app.openConfirmModal(`Delete "${loc.name}"? Items inside will move to Storage.`, async () => {
-                    try {
-                        const batch = writeBatch(db);
-                        const items = state.inventory.filter(i => i.locationId === locationId);
-                        items.forEach(i => {
-                            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id);
-                            batch.update(ref, { locationId: null });
-                        });
-
-                        if (loc.type === 'floor') {
-                            const childRooms = state.locations.filter(l => l.parentId === locationId);
-                            childRooms.forEach(room => {
-                                const roomItems = state.inventory.filter(i => i.locationId === room.id);
-                                roomItems.forEach(i => {
-                                    const iRef = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', i.id);
-                                    batch.update(iRef, { locationId: null });
-                                });
-                                batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'locations', room.id));
-                            });
-                        }
-                        batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'locations', locationId));
-
-                        await batch.commit();
-                        await logActivity('Location Deleted', `Location: ${loc.name} deleted`);
-                        app.closeModal();
-                        showToast("Location Deleted");
-                        if (state.activeTab === 'settings') renderMainContent();
-                    } catch(err) { console.error(err); showToast(`Failed to delete location.`, 'error'); }
-                });
-            },
-
-            submitEditLocation: async (e, locationId) => {
-                e.preventDefault();
-                const form = e.target;
-                const updateData = { name: form.name.value };
-                if (form.customId) updateData.customId = form.customId.value;
-                try {
-                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'locations', locationId);
-                    await updateDoc(ref, updateData);
-                    await logActivity('Location Edited', `Updated location: ${form.name.value}`);
-                    app.closeModal();
-                    showToast("Location Updated");
-                    if(state.activeTab === 'settings') renderMainContent();
-                } catch (err) { console.error(err); showToast("Failed to update location", 'error'); }
-            },
-
-            // --- FIXED: ADD THIS MISSING FUNCTION ---
-            submitAddLocation: async (e) => {
-                e.preventDefault();
-                const form = e.target;
-                const data = {
-                    name: form.name.value,
-                    type: form.type.value,
-                    parentId: form.parentId.value || null,
-                    createdAt: new Date().toISOString()
-                };
-                if (data.type === 'room' || data.type === 'box') {
-                    data.customId = form.customId ? form.customId.value : null;
-                }
-                if (data.type === 'room') {
-                    data.status = form.status ? form.status.value : 'vacant';
-                }
-                try {
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'locations'), data);
-                    await logActivity('Location Added', `Added ${data.type}: ${data.name}`);
-                    app.closeModal();
-                    showToast(`${data.type} Created`);
-                    if(state.activeTab === 'settings') renderMainContent();
-                } catch (err) { console.error(err); showToast("Error creating location", 'error'); }
-            },
-
-            submitMoveItem: async (itemId, locationId, itemName, itemCode) => {
-                try {
-                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', itemId);
-                    const locationName = getLocationNamePlain(locationId);
-
-                    if (locationId === 'PULLOUT') {
-                        await updateDoc(ref, { locationId: null, isDisposed: true });
-                        await logActivity('Item Disposed', `${itemCode} ${itemName} moved to Pullout`);
-                        showToast("Item moved to Pullout");
-                    } else {
-                        await updateDoc(ref, { locationId: locationId || null, isDisposed: false });
-                        await logActivity('Item Moved', `${itemCode} ${itemName} moved to ${locationName}`);
-                        showToast("Item Moved");
-                    }
-                    app.closeModal();
-                } catch (err) { console.error(err); showToast("Error moving item", 'error'); }
-            },
-
-            submitAddItems: async (e, locationId) => {
-                e.preventDefault();
-                const formData = new FormData(e.target);
-                const selectedIds = formData.getAll('selectedItems');
-                if (selectedIds.length === 0) return;
-                
-                const locationName = getLocationNamePlain(locationId);
-
-                try {
-                    const batch = writeBatch(db);
-                    selectedIds.forEach(id => {
-                        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id);
-                        batch.update(ref, { locationId: locationId, isDisposed: false });
-                    });
                     await batch.commit();
-                    await logActivity('Bulk Items Added', `Added ${selectedIds.length} items to ${locationName}`);
+                    await logActivity('Item Renamed', `Renamed "${oldName}" to "${newName}" (${itemsToUpdate.length} items)`);
                     app.closeModal();
-                    showToast("Items Added");
-                } catch (err) { console.error(err); showToast("Failed to add items.", 'error'); }
+                    showToast("Items Renamed");
+                } catch (err) { console.error(err); showToast("Error renaming items", 'error'); }
             },
 
             submitSwap: async (sourceId, targetId, swapType) => {
@@ -1902,6 +1715,19 @@
                         btn.classList.remove('nav-item-active');
                         // Restore special class for settings if needed
                         if(tab === 'settings') btn.classList.add('text-gray-500'); 
+                    }
+                }
+            });
+            // Update Mobile Nav
+            ['dashboard', 'storage', 'floors', 'boxes', 'settings'].forEach(tab => {
+                const btn = document.getElementById(`mob-${tab}`);
+                if (btn) {
+                    if (tab === state.activeTab) {
+                        btn.classList.remove('mobile-nav-inactive');
+                        btn.classList.add('mobile-nav-active');
+                    } else {
+                        btn.classList.add('mobile-nav-inactive');
+                        btn.classList.remove('mobile-nav-active');
                     }
                 }
             });
