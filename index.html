@@ -222,7 +222,7 @@
     <!-- Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, sendPasswordResetEmail, updateEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, sendPasswordResetEmail, updateEmail, updatePassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, writeBatch, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- ICON GENERATION ---
@@ -430,10 +430,14 @@
                             <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Nickname</label>
                             <input name="nickname" value="${user.displayName || ''}" required class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" />
                         </div>
-                        <div class="mb-6">
+                        <div class="mb-4">
                             <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Email</label>
                             <input type="email" name="email" value="${user.email}" required class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" />
                             <p class="text-[10px] text-gray-400 mt-1">Changing email may require re-login.</p>
+                        </div>
+                        <div class="mb-6">
+                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">New Password</label>
+                            <input type="password" name="password" placeholder="Leave blank to keep current" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" />
                         </div>
                         <div class="flex justify-end gap-3">
                             <button type="button" onclick="app.closeModal()" class="px-5 py-2.5 text-gray-500 font-medium hover:text-gray-700">Cancel</button>
@@ -894,6 +898,7 @@
                 e.preventDefault();
                 const nickname = e.target.nickname.value.trim();
                 const email = e.target.email.value.trim();
+                const password = e.target.password.value;
                 const user = auth.currentUser;
                 
                 if (!user) return;
@@ -908,6 +913,11 @@
                     
                     if (email !== user.email) {
                         await updateEmail(user, email);
+                        updated = true;
+                    }
+
+                    if (password) {
+                        await updatePassword(user, password);
                         updated = true;
                     }
                     
@@ -926,7 +936,7 @@
                 } catch (error) {
                     console.error(error);
                     if (error.code === 'auth/requires-recent-login') {
-                        showToast("Please log out and log in again to change email.", 'error');
+                        showToast("Please log out and log in again to change email/password.", 'error');
                     } else {
                         showToast("Update failed: " + error.message, 'error');
                     }
