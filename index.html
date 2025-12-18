@@ -269,25 +269,25 @@
         document.getElementById('favicon-link').href = appIconUrl;
 
         // --- FIREBASE CONFIGURATION ---
-        // ⚠️ IMPORTANT: REPLACE THIS WITH YOUR OWN FIREBASE PROJECT CONFIGURATION
-        // 1. Go to console.firebase.google.com
-        // 2. Create a project
-        // 3. Add a Web App
-        // 4. Copy the config below
-        // 5. Enable Authentication > Sign-in method > Email/Password
         // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyAOB5sXGQPdchw3jhWojfy749cOTeAcfyw",
-  authDomain: "inventory-app-84fbf.firebaseapp.com",
-  projectId: "inventory-app-84fbf",
-  storageBucket: "inventory-app-84fbf.firebasestorage.app",
-  messagingSenderId: "120713547404",
-  appId: "1:120713547404:web:d092abf67d26a33351b5a9",
-  measurementId: "G-3KLSG5BE43"
-};
+        const customConfig = {
+            apiKey: "AIzaSyAOB5sXGQPdchw3jhWojfy749cOTeAcfyw",
+            authDomain: "inventory-app-84fbf.firebaseapp.com",
+            projectId: "inventory-app-84fbf",
+            storageBucket: "inventory-app-84fbf.firebasestorage.app",
+            messagingSenderId: "120713547404",
+            appId: "1:120713547404:web:d092abf67d26a33351b5a9",
+            measurementId: "G-3KLSG5BE43"
+        };
 
         let firebaseConfig = customConfig;
-        if (typeof __firebase_config !== 'undefined') firebaseConfig = JSON.parse(__firebase_config);
+        if (typeof __firebase_config !== 'undefined') {
+            try {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } catch (e) {
+                console.warn("Using default/custom config.");
+            }
+        }
 
         const appInstance = initializeApp(firebaseConfig);
         const auth = getAuth(appInstance);
@@ -335,6 +335,7 @@ const firebaseConfig = {
         }
 
         function generateDashboardView() {
+            // ... (Same as before)
             const totalItems = state.inventory.filter(i => !i.isDisposed).length;
             const disposedItems = state.inventory.filter(i => i.isDisposed).length;
             const assignedItems = state.inventory.filter(i => !i.isDisposed && i.locationId).length;
